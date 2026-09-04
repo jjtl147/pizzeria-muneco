@@ -4,9 +4,11 @@ import Home from './pages/Home'
 import Catalogo from './pages/Catalogo'
 import Carrito from './pages/Carrito'
 import Login from './pages/Login'
+import { CartProvider } from './context/CartContext'
 
 function App() {
   return (
+    <CartProvider>
     <BrowserRouter>
       <Routes>
         <Route element={<MainLayout />}>
@@ -17,6 +19,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </CartProvider>
   )
 }
 export default App

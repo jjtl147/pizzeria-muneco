@@ -18,6 +18,7 @@ function Catalogo() {
         {products.map((producto) => (
           <Col key={producto.id}>
             <ProductCard
+              id={producto.id}
               nombre={producto.nombre}
               descripcion={producto.descripcion}
               precio={producto.precio}

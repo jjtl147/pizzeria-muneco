@@ -2,8 +2,10 @@ import { Outlet, Link } from 'react-router-dom'
 import Container from 'react-bootstrap/Container'
 import Nav from 'react-bootstrap/Nav'
 import Navbar from 'react-bootstrap/Navbar'
-
+import { useContext } from 'react'
+import { CartContext } from '../context/CartContext'
 function MainLayout() {
+  const { totalItems } = useContext(CartContext)
   return (
     <>
       <Navbar bg="dark" variant="dark" expand="lg">
@@ -14,7 +16,7 @@ function MainLayout() {
             <Nav className="ms-auto">
               <Nav.Link as={Link} to="/">Inicio</Nav.Link>
               <Nav.Link as={Link} to="/catalogo">Catálogo</Nav.Link>
-              <Nav.Link as={Link} to="/carrito">Carrito</Nav.Link>
+              <Nav.Link as={Link} to="/carrito">Carrito ({totalItems})</Nav.Link>
               <Nav.Link as={Link} to="/login">Iniciar sesión</Nav.Link>
             </Nav>
           </Navbar.Collapse>

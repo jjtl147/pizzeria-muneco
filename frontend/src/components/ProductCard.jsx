@@ -1,18 +1,12 @@
+import { useContext } from 'react'
 import Card from 'react-bootstrap/Card'
 import Button from 'react-bootstrap/Button'
+import { CartContext } from '../context/CartContext'
 
-/**
- * Componente reutilizable para mostrar la información individual de un producto.
- * 
- * Props recibidas:
- * - nombre: string con el nombre del producto
- * - descripcion: string con la descripción del producto
- * - precio: number con el precio del producto
- * - imagen: string con la URL de la imagen representativa
- */
-function ProductCard({ nombre, descripcion, precio, imagen }) {
+function ProductCard({ id, nombre, descripcion, precio, imagen }) {
+  const { agregarAlCarrito } = useContext(CartContext)
+
   return (
-    // La clase "h-100" asegura que todas las tarjetas en la misma fila tengan la misma altura
     <Card className="h-100 shadow-sm">
       <Card.Img variant="top" src={imagen} alt={nombre} />
       <Card.Body className="d-flex flex-column">
@@ -21,8 +15,15 @@ function ProductCard({ nombre, descripcion, precio, imagen }) {
           {descripcion}
         </Card.Text>
         <div className="d-flex justify-content-between align-items-center mt-3">
-          <span className="fs-5 fw-bold text-primary">${Number(precio).toFixed(2)}</span>
-          <Button variant="primary">Agregar</Button>
+          <span className="fs-5 fw-bold text-primary">
+            ${Number(precio).toFixed(2)}
+          </span>
+          <Button
+            variant="primary"
+            onClick={() => agregarAlCarrito({ id, nombre, precio, imagen })}
+          >
+            Agregar
+          </Button>
         </div>
       </Card.Body>
     </Card>
@@ -30,4 +31,3 @@ function ProductCard({ nombre, descripcion, precio, imagen }) {
 }
 
 export default ProductCard
-
