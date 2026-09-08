@@ -62,8 +62,8 @@ del repositorio.
 ### Sprint 1 — 4 al 18 de septiembre
 **Objetivo:** Cerrar frontend cliente base + iniciar backend
 
-- [ ] Completar Home y Login (contenido visual completo)
-- [ ] Estructura de carpetas Flask (app/, routes/, models/)
+- [x] Completar Home y Login (contenido visual completo)
+- [x] Estructura de carpetas Flask (app/, routes/, models/)
 - [ ] Configurar conexión Flask ↔ Supabase (.env)
 - [ ] Diseñar esquema de base de datos (usuarios, productos, categorías, pedidos, inventario)
 - [ ] Endpoint GET /api/productos funcionando con datos reales
