@@ -7,6 +7,28 @@
 
 ---
 
+## Fase 0 — Configuración inicial y funcionalidades base (previo al inicio formal de Scrum)
+
+Antes de adoptar la metodología Scrum de forma estructurada, se desarrollaron las siguientes funcionalidades base, registradas en el historial de control de versiones (Git/GitHub):
+
+- Inicialización del proyecto frontend (React + Vite + pnpm)
+- Configuración de Bootstrap y React Bootstrap
+- Estructura de rutas con React Router (Home, Catálogo, Carrito, Login)
+- Diseño del layout base (Navbar + Outlet)
+- Implementación del catálogo de productos con datos de ejemplo (mock data)
+- Implementación del carrito de compras funcional, utilizando el patrón
+  Context API de React (Context + Provider + hook useContext) para el
+  manejo de estado global sin necesidad de librerías externas (Redux/Zustand),
+  en línea con las restricciones de arquitectura definidas para el proyecto
+- Configuración de control de versiones (Git) y repositorio remoto en GitHub
+- Migración del entorno de desarrollo de Windows a Linux (Pop!_OS)
+
+Esta fase corresponde al periodo previo al 4 de septiembre de 2026, y su
+evidencia de desarrollo se encuentra documentada en el historial de commits
+del repositorio.
+
+---
+
 ## Resumen de avance al inicio de la planificación
 
 ### Frontend
@@ -40,7 +62,7 @@
 ### Sprint 1 — 4 al 18 de septiembre
 **Objetivo:** Cerrar frontend cliente base + iniciar backend
 
-- [x] Completar Home y Login (contenido visual completo)
+- [ ] Completar Home y Login (contenido visual completo)
 - [ ] Estructura de carpetas Flask (app/, routes/, models/)
 - [ ] Configurar conexión Flask ↔ Supabase (.env)
 - [ ] Diseñar esquema de base de datos (usuarios, productos, categorías, pedidos, inventario)
