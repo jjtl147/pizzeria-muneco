@@ -2,8 +2,12 @@
 **Proyecto de titulación — Ingeniería de Sistemas**
 
 **Fecha de inicio de planificación:** 4 de septiembre de 2026
-**Fecha objetivo de entrega (MVP completo):** 20 de noviembre de 2026
-**Duración total:** 11 semanas
+**Fecha objetivo de entrega (MVP completo):** 10 de noviembre de 2026
+**Duración total:** 67 días (~9.5 semanas)
+
+> Nota: la fecha límite se ajustó de 20 al 10 de noviembre de 2026, por lo que
+> los sprints posteriores al Sprint 1 se comprimieron de 14 a 12 días, y el
+> buffer final se redujo de 7 a 5 días, manteniendo el mismo alcance funcional.
 
 ---
 
@@ -62,13 +66,13 @@ del repositorio.
 ### Sprint 1 — 4 al 18 de septiembre
 **Objetivo:** Cerrar frontend cliente base + iniciar backend
 
-- [x] Completar Home y Login (contenido visual completo)
-- [x] Estructura de carpetas Flask (app/, routes/, models/)
+- [ ] Completar Home y Login (contenido visual completo)
+- [x] Estructura de carpetas Flask (app/, routes/, models/) — versión inicial simple (app.py) con entorno virtual y servidor de desarrollo funcional; se reorganizará en subcarpetas cuando la lógica del backend crezca
 - [ ] Configurar conexión Flask ↔ Supabase (.env)
 - [ ] Diseñar esquema de base de datos (usuarios, productos, categorías, pedidos, inventario)
 - [ ] Endpoint GET /api/productos funcionando con datos reales
 
-### Sprint 2 — 18 de septiembre al 2 de octubre
+### Sprint 2 — 18 al 30 de septiembre
 **Objetivo:** API REST funcional + autenticación backend
 
 - [ ] Endpoints CRUD de productos
@@ -77,7 +81,7 @@ del repositorio.
 - [ ] Sistema de autenticación en Flask (JWT + hash de contraseñas)
 - [ ] Endpoints POST /api/auth/registro y POST /api/auth/login
 
-### Sprint 3 — 2 al 16 de octubre
+### Sprint 3 — 30 de septiembre al 12 de octubre
 **Objetivo:** Autenticación funcional en frontend + pedidos del cliente
 
 - [ ] Formulario de Login/Registro conectado al backend real
@@ -85,7 +89,7 @@ del repositorio.
 - [ ] Página "Mis pedidos" (historial + estado)
 - [ ] Cerrar sesión funcional
 
-### Sprint 4 — 16 al 30 de octubre
+### Sprint 4 — 12 al 24 de octubre
 **Objetivo:** Panel administrativo — gestión operativa
 
 - [ ] Layout del panel admin (rutas protegidas para rol administrador)
@@ -93,14 +97,15 @@ del repositorio.
 - [ ] Gestión de inventario (stock, alertas de stock bajo)
 - [ ] Gestión de pedidos (cambio de estados)
 
-### Sprint 5 — 30 de octubre al 13 de noviembre
-**Objetivo:** Reportes + integración Telegram
+### Sprint 5 — 24 de octubre al 5 de noviembre
+**Objetivo:** Reportes + integración Telegram y n8n
 
 - [ ] Dashboard de ventas/estadísticas
+- [ ] Configuración de n8n para automatización de flujos con Telegram
 - [ ] Bot de Telegram: notificaciones (nuevo pedido, stock bajo)
 - [ ] Asistente conversacional básico (consultas simples al backend)
 
-### Buffer final — 13 al 20 de noviembre
+### Buffer final — 5 al 10 de noviembre
 **Objetivo:** Estabilización y documentación
 
 - [ ] Pruebas de extremo a extremo
