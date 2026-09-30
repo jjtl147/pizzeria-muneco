@@ -33,7 +33,7 @@ del repositorio.
 
 ---
 
-## Resumen de avance al inicio de la planificación
+## Resumen de avance del proyecto
 
 ### Frontend
 | Módulo | Estado | % |
@@ -41,36 +41,38 @@ del repositorio.
 | Estructura base (Vite, rutas, navbar) | Completo | 100% |
 | Catálogo de productos (mock data) | Completo | 100% |
 | Carrito de compras (Context API) | Completo | 100% |
-| Página Home (contenido real) | En progreso | 15% |
-| Página Login (formulario real) | En progreso | 10% |
-| Conexión a backend real | No iniciado | 0% |
+| Página Home (contenido visual completo) | Completo | 100% |
+| Página Login (formulario visual completo) | Completo | 100% |
+| Conexión a backend real (Axios) | Pendiente (Sprint 2) | 0% |
 
-**Frontend total (fase cliente): ~55%**
+**Frontend total (fase cliente): ~80%**
 
 ### Backend
 | Módulo | Estado | % |
 |---|---|---|
-| Estructura Flask | No iniciado | 0% |
-| API REST (endpoints) | No iniciado | 0% |
-| Conexión a Supabase/PostgreSQL | No iniciado | 0% |
-| Autenticación y roles | No iniciado | 0% |
+| Estructura Flask (entorno virtual, app.py, CORS) | Completo | 100% |
+| Conexión a Supabase/PostgreSQL (.env) | Completo | 100% |
+| Esquema de base de datos relacional (schema.sql) | Completo | 100% |
+| Endpoint GET /api/productos (consulta real a BD) | Completo | 100% |
+| API REST completa (CRUD productos/pedidos) | En progreso (Sprint 2) | 25% |
+| Autenticación y roles (JWT) | No iniciado (Sprint 2) | 0% |
 
-**Backend total: 0%**
+**Backend total: ~35%**
 
-### Avance general estimado del proyecto: ~11%
+### Avance general estimado del proyecto: ~28%
 
 ---
 
 ## Sprints planificados
 
-### Sprint 1 — 4 al 18 de septiembre
+### Sprint 1 — 4 al 18 de septiembre (COMPLETADO ✅)
 **Objetivo:** Cerrar frontend cliente base + iniciar backend
 
-- [ ] Completar Home y Login (contenido visual completo)
+- [x] Completar Home y Login (contenido visual completo)
 - [x] Estructura de carpetas Flask (app/, routes/, models/) — versión inicial simple (app.py) con entorno virtual y servidor de desarrollo funcional; se reorganizará en subcarpetas cuando la lógica del backend crezca
-- [ ] Configurar conexión Flask ↔ Supabase (.env)
-- [ ] Diseñar esquema de base de datos (usuarios, productos, categorías, pedidos, inventario)
-- [ ] Endpoint GET /api/productos funcionando con datos reales
+- [x] Configurar conexión Flask ↔ Supabase (.env)
+- [x] Diseñar esquema de base de datos (usuarios, productos, categorías, pedidos, inventario)
+- [x] Endpoint GET /api/productos funcionando con datos reales
 
 ### Sprint 2 — 18 al 30 de septiembre
 **Objetivo:** API REST funcional + autenticación backend
