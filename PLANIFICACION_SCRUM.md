@@ -79,7 +79,7 @@ del repositorio.
 
 - [ ] Endpoints CRUD de productos
 - [ ] Endpoint POST /api/pedidos
-- [ ] Reemplazar products.js mock por consumo real vía Axios
+- [x] Reemplazar products.js mock por consumo real vía Axios
 - [ ] Sistema de autenticación en Flask (JWT + hash de contraseñas)
 - [ ] Endpoints POST /api/auth/registro y POST /api/auth/login
 

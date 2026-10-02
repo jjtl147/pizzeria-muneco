@@ -18,11 +18,20 @@ SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
 def get_supabase_client() -> Client:
     """
     Inicializa y retorna la instancia del cliente de Supabase.
-    Valida que las credenciales no sean las predeterminadas.
+    Limpia y valida la URL base y la clave de acceso.
     """
-    if not SUPABASE_URL or not SUPABASE_KEY or 'tu-proyecto' in SUPABASE_URL:
+    url = os.getenv('SUPABASE_URL', '').strip()
+    key = os.getenv('SUPABASE_KEY', '').strip()
+
+    if not url or not key or 'tu-proyecto' in url:
         raise ValueError("Las credenciales de Supabase no están configuradas correctamente en el archivo .env")
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+    # Asegurar que la URL sea la raíz base (remover /rest/v1 o barras finales)
+    if '/rest/v1' in url:
+        url = url.split('/rest/v1')[0]
+    url = url.rstrip('/')
+
+    return create_client(url, key)
 
 # ==========================================
 # RUTAS / ENDPOINTS DE LA API
@@ -55,32 +64,35 @@ def status():
 @app.route('/api/productos', methods=['GET'])
 def obtener_productos():
     """
-    Endpoint para obtener el listado de productos activos desde la base de datos (Supabase).
+    Endpoint para obtener el listado de productos desde la base de datos (Supabase).
     Retorna la lista de productos en formato JSON.
     """
     try:
         supabase = get_supabase_client()
-        # Consulta a la tabla 'productos' filtrando los que están activos y ordenados por id
-        response = supabase.table('productos')\
-            .select('id, categoria_id, nombre, descripcion, precio, imagen, activo')\
-            .eq('activo', True)\
-            .order('id')\
-            .execute()
+        # Consulta flexible de todos los campos de la tabla 'productos'
+        response = supabase.table('productos').select('*').execute()
+
+        # Si los datos tienen campo 'activo', filtramos los activos; si no, devolvemos todos
+        productos = response.data or []
+        if productos and 'activo' in productos[0]:
+            productos = [p for p in productos if p.get('activo') is not False]
 
         return jsonify({
             "status": "success",
-            "total": len(response.data),
-            "data": response.data
+            "total": len(productos),
+            "data": productos
         }), 200
 
     except ValueError as val_err:
-        # Error cuando faltan credenciales en el archivo .env
+        print(f"[ERROR CONFIG] {val_err}")
         return jsonify({
             "status": "error",
             "mensaje": str(val_err)
         }), 500
     except Exception as e:
-        # Error de conexión o consulta a la base de datos
+        print(f"[ERROR BD /api/productos]: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "status": "error",
             "mensaje": f"Error al consultar la base de datos: {str(e)}"
