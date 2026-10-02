@@ -94,18 +94,18 @@ del repositorio.
 ### Sprint 4 — 12 al 24 de octubre
 **Objetivo:** Panel administrativo — gestión operativa
 
+- [ ] Script seed_admin.py para creación formal del administrador inicial (reemplaza la asignación manual de rol vía SQL usada durante pruebas)
 - [ ] Layout del panel admin (rutas protegidas para rol administrador)
 - [ ] CRUD visual de productos y categorías
 - [ ] Gestión de inventario (stock, alertas de stock bajo)
 - [ ] Gestión de pedidos (cambio de estados)
 
 ### Sprint 5 — 24 de octubre al 5 de noviembre
-**Objetivo:** Reportes + integración Telegram y n8n
+**Objetivo:** Reportes + integración con Telegram
 
 - [ ] Dashboard de ventas/estadísticas
-- [ ] Configuración de n8n para automatización de flujos con Telegram
-- [ ] Bot de Telegram: notificaciones (nuevo pedido, stock bajo)
-- [ ] Asistente conversacional básico (consultas simples al backend)
+- [ ] Bot de Telegram: notificaciones (nuevo pedido, stock bajo), integrado directamente desde el backend en Flask
+- [ ] Asistente conversacional mediante modelo de lenguaje (LLM con function calling), consultando datos reales del backend
 
 ### Buffer final — 5 al 10 de noviembre
 **Objetivo:** Estabilización y documentación
@@ -122,4 +122,4 @@ Este proyecto sigue un enfoque Scrum adaptado para desarrollo individual:
 - Sprints de 2 semanas de duración
 - Revisión de avance al cierre de cada sprint, con reorganización del backlog siguiente según el progreso real
 - El backlog de cada sprint puede ajustarse; el Sprint Goal (objetivo general) se mantiene como guía principal
-- Funcionalidades no contempladas en este plan (mejoras post-MVP) se gestionan por separado, fuera del alcance de los 100% funcionales previstos para el 20 de noviembre
+- Funcionalidades no contempladas en este plan (mejoras post-MVP) se gestionan por separado, fuera del alcance de los 100% funcionales previstos para el 10 de noviembre
