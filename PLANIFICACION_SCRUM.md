@@ -53,13 +53,13 @@ del repositorio.
 | Estructura Flask (entorno virtual, app.py, CORS) | Completo | 100% |
 | Conexión a Supabase/PostgreSQL (.env) | Completo | 100% |
 | Esquema de base de datos relacional (schema.sql) | Completo | 100% |
-| Endpoint GET /api/productos (consulta real a BD) | Completo | 100% |
-| API REST completa (CRUD productos/pedidos) | En progreso (Sprint 2) | 25% |
-| Autenticación y roles (JWT) | No iniciado (Sprint 2) | 0% |
+| API REST CRUD Productos (GET, POST, PUT, DELETE) | Completo | 100% |
+| Módulo de Pedidos (POST /api/pedidos, historial) | Completo | 100% |
+| Autenticación y roles con JWT + Hashing | Completo | 100% |
 
-**Backend total: ~35%**
+**Backend total: ~75%**
 
-### Avance general estimado del proyecto: ~28%
+### Avance general estimado del proyecto: ~50%
 
 ---
 
@@ -74,14 +74,14 @@ del repositorio.
 - [x] Diseñar esquema de base de datos (usuarios, productos, categorías, pedidos, inventario)
 - [x] Endpoint GET /api/productos funcionando con datos reales
 
-### Sprint 2 — 18 al 30 de septiembre
+### Sprint 2 — 18 al 30 de septiembre (COMPLETADO ✅)
 **Objetivo:** API REST funcional + autenticación backend
 
-- [ ] Endpoints CRUD de productos
-- [ ] Endpoint POST /api/pedidos
+- [x] Endpoints CRUD de productos
+- [x] Endpoint POST /api/pedidos
 - [x] Reemplazar products.js mock por consumo real vía Axios
-- [ ] Sistema de autenticación en Flask (JWT + hash de contraseñas)
-- [ ] Endpoints POST /api/auth/registro y POST /api/auth/login
+- [x] Sistema de autenticación en Flask (JWT + hash de contraseñas)
+- [x] Endpoints POST /api/auth/registro y POST /api/auth/login
 
 ### Sprint 3 — 30 de septiembre al 12 de octubre
 **Objetivo:** Autenticación funcional en frontend + pedidos del cliente
