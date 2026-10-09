@@ -99,7 +99,7 @@ Objetivo: API REST de productos, pedidos y autenticación.
 - [x] Catálogo con Axios; Home también consume productos reales.
 - [x] Correcciones: validación, secreto JWT obligatorio y operaciones atómicas.
 - [x] Aplicar migración 001 en Supabase (ejecución informada por el estudiante).
-- [ ] Verificar pedidos e inventario en el Supabase real.
+- [x] Verificar pedidos e inventario en el Supabase real.
 
 ## Sprint 3 — 2 al 14 de octubre
 
@@ -113,8 +113,8 @@ Las correcciones de base cubren la transición después del Sprint 2.
 - [x] JWT con roles y decorador `rol_requerido(...)`.
 - [x] Autorizar VENDEDOR para consultar pedidos y cambiar estados.
 - [x] RF-04: selección de tamaño, precio y stock independientes.
-- [ ] Confirmar ejecución correcta de migración 002 en Supabase.
-- [ ] Comprobar login de usuarios existentes con los nuevos roles.
+- [x] Confirmar ejecución correcta de migración 002 en Supabase.
+- [x] Comprobar login de usuarios existentes con los nuevos roles.
 - [ ] Aceptar flujo completo de compra en el entorno real.
 - [ ] Conciliar si los pedidos anteriores descontaron stock antes de permitir su cancelación.
 
