@@ -1,6 +1,10 @@
 import os
 import datetime
 from functools import wraps
+from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo
+from integrations import notificar_pedido, notificar_stock, responder_asistente
+from postgrest.exceptions import APIError
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -15,20 +19,66 @@ CORS(app)
 
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
-JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'pizzeria_muneco_secreto_super_seguro_jwt_2026')
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', '').strip()
 
 def get_supabase_client() -> Client:
     url = os.getenv('SUPABASE_URL', '').strip()
     key = os.getenv('SUPABASE_KEY', '').strip()
 
     if not url or not key or 'tu-proyecto' in url:
-        raise ValueError("Las credenciales de Supabase no están configuradas correctamente en el archivo .env")
+        raise RuntimeError("Las credenciales de Supabase no están configuradas correctamente en el archivo .env")
 
     if '/rest/v1' in url:
         url = url.split('/rest/v1')[0]
     url = url.rstrip('/')
 
     return create_client(url, key)
+
+# Validaciones compartidas: los datos del navegador no son confiables.
+def datos_json():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ValueError("El cuerpo debe ser un objeto JSON válido.")
+    return data
+
+
+def texto(data, campo, obligatorio=False, limite=None, recortar=True):
+    valor = data.get(campo, '')
+    if not isinstance(valor, str):
+        raise ValueError(f"El campo '{campo}' debe ser texto.")
+    valor = valor.strip() if recortar else valor
+    if obligatorio and not valor:
+        raise ValueError(f"El campo '{campo}' es obligatorio.")
+    if limite and len(valor) > limite:
+        raise ValueError(f"El campo '{campo}' admite hasta {limite} caracteres.")
+    return valor
+
+
+def entero(valor, campo, minimo=1):
+    if type(valor) is not int or not minimo <= valor <= 2147483647:
+        raise ValueError(f"El campo '{campo}' debe ser un entero entre {minimo} y 2147483647.")
+    return valor
+
+
+def precio_validado(valor):
+    if isinstance(valor, bool) or not isinstance(valor, (int, float, str)):
+        raise ValueError("El precio debe ser un número válido mayor o igual a 0.")
+    try:
+        precio = Decimal(str(valor))
+        if not precio.is_finite() or not 0 <= precio <= Decimal('99999999.99'):
+            raise InvalidOperation()
+        if precio != precio.quantize(Decimal('0.01')):
+            raise InvalidOperation()
+        return float(precio)
+    except InvalidOperation:
+        raise ValueError("El precio debe ser no negativo y tener como máximo dos decimales.") from None
+
+
+def clave_jwt():
+    if len(JWT_SECRET_KEY) < 32:
+        raise RuntimeError("Configure JWT_SECRET_KEY con al menos 32 caracteres aleatorios.")
+    return JWT_SECRET_KEY
+
 
 # ==========================================
 # MIDDLEWARES / DECORADORES DE AUTENTICACIÓN
@@ -52,32 +102,118 @@ def token_requerido(f):
             }), 401
 
         try:
-            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
-            usuario_actual = payload
+            payload = jwt.decode(token, clave_jwt(), algorithms=['HS256'],
+                                 options={'require': ['exp', 'usuario_id', 'roles']})
+            entero(payload.get('usuario_id'), 'usuario_id')
+            validar_roles(payload.get('roles'))
+            usuario = cargar_usuario(payload['usuario_id'])
+            if not usuario:
+                return jsonify({'status': 'error', 'mensaje': 'La cuenta ya no existe.'}), 401
+            usuario_actual = {**usuario, 'usuario_id': usuario['id']}
+            validar_roles(usuario_actual.get('roles'))
         except jwt.ExpiredSignatureError:
             return jsonify({
                 "status": "error",
                 "mensaje": "El token ha expirado. Inicie sesión nuevamente."
             }), 401
-        except jwt.InvalidTokenError:
+        except (jwt.InvalidTokenError, ValueError):
             return jsonify({
                 "status": "error",
                 "mensaje": "Token de autenticación inválido."
             }), 401
 
+        except RuntimeError:
+            return jsonify({"status": "error", "mensaje": "Autenticación no configurada en el servidor."}), 503
+        except Exception:
+            app.logger.exception('No se pudo verificar la sesión')
+            return jsonify({'status': 'error', 'mensaje': 'No se pudo verificar la sesión. Intente nuevamente.'}), 503
+
         return f(usuario_actual, *args, **kwargs)
     return decorador
 
-def admin_requerido(f):
+ROLES = {'CLIENTE', 'VENDEDOR', 'ADMINISTRADOR'}
+METODOS_PAGO = {'EFECTIVO', 'QR', 'TARJETA'}
+
+
+def validar_roles(roles):
+    if not isinstance(roles, list) or not roles or any(not isinstance(r, str) or r not in ROLES for r in roles):
+        raise ValueError('Seleccione al menos un rol válido.')
+    if len(roles) != len(set(roles)):
+        raise ValueError('Los roles no deben repetirse.')
+    return roles
+
+
+def cargar_usuario(usuario_id):
+    resultado = get_supabase_client().table('usuarios').select(
+        'id,nombre,email,roles,telefono,direccion,creado_en').eq('id', usuario_id).execute()
+    return resultado.data[0] if resultado.data else None
+
+
+def rol_requerido(*roles_permitidos):
+    # OR entre permisos: basta tener uno de los roles solicitados.
+    def envolver(f):
+        @wraps(f)
+        def decorador(usuario_actual, *args, **kwargs):
+            if not set(usuario_actual.get('roles', [])) & set(roles_permitidos):
+                return jsonify({'status': 'error', 'mensaje': 'No tiene permisos para esta operación.'}), 403
+            return f(usuario_actual, *args, **kwargs)
+        return decorador
+    return envolver
+
+
+def errores_api(f):
     @wraps(f)
-    def decorador(usuario_actual, *args, **kwargs):
-        if usuario_actual.get('rol') != 'ADMINISTRADOR':
-            return jsonify({
-                "status": "error",
-                "mensaje": "Acceso denegado. Se requieren permisos de ADMINISTRADOR."
-            }), 403
-        return f(usuario_actual, *args, **kwargs)
+    def decorador(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except ValueError as error:
+            return jsonify({'status': 'error', 'mensaje': str(error)}), 400
+        except APIError as error:
+            if error.code == 'P0001':
+                return jsonify({'status': 'error', 'mensaje': error.message}), 400
+            if error.code == '23505':
+                return jsonify({'status': 'error', 'mensaje': 'El registro ya existe.'}), 409
+            if error.code in ('23503', '23514', '22003'):
+                return jsonify({'status': 'error', 'mensaje': 'Los datos no cumplen las restricciones de la base.'}), 400
+            app.logger.exception('Error de base de datos')
+            return jsonify({'status': 'error', 'mensaje': 'No se pudo completar la operación.'}), 500
+        except Exception:
+            app.logger.exception('Error interno de API')
+            return jsonify({'status': 'error', 'mensaje': 'No se pudo completar la operación.'}), 500
     return decorador
+
+
+def items_validados(items):
+    if not isinstance(items, list) or not items or len(items) > 100:
+        raise ValueError('Incluya entre 1 y 100 productos.')
+    resultado = []
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError('Cada ítem debe ser un objeto JSON.')
+        resultado.append({'producto_id': entero(item.get('producto_id'), 'producto_id'),
+                          'cantidad': entero(item.get('cantidad'), 'cantidad')})
+    return resultado
+
+
+def metodo_validado(data):
+    metodo = texto(data, 'metodo_pago', obligatorio=True).upper()
+    if metodo not in METODOS_PAGO:
+        raise ValueError('Seleccione EFECTIVO, QR o TARJETA.')
+    return metodo
+
+
+def pagina_consulta(consulta):
+    try:
+        pagina = int(request.args.get('pagina', '1'))
+    except ValueError:
+        raise ValueError('Página inválida.') from None
+    if pagina < 1:
+        raise ValueError('Página inválida.')
+    resultado = consulta.range((pagina - 1) * 50, pagina * 50 - 1).execute()
+    data = resultado.data or []
+    return jsonify({'status': 'success', 'data': data, 'pagina': pagina,
+                    'hay_mas': len(data) == 50})
+
 
 # ==========================================
 # RUTAS DE ESTADO Y DOCUMENTACIÓN
@@ -89,18 +225,9 @@ def index():
         "status": "success",
         "mensaje": "API Pizzería Muñeco - Backend Flask activo",
         "endpoints_disponibles": [
-            {"metodo": "GET", "ruta": "/api/status", "descripcion": "Health check"},
-            {"metodo": "GET", "ruta": "/api/productos", "descripcion": "Listar productos activos"},
-            {"metodo": "GET", "ruta": "/api/productos/<id>", "descripcion": "Ver detalle de producto"},
-            {"metodo": "POST", "ruta": "/api/productos", "descripcion": "Crear producto (Admin)"},
-            {"metodo": "PUT", "ruta": "/api/productos/<id>", "descripcion": "Actualizar producto (Admin)"},
-            {"metodo": "DELETE", "ruta": "/api/productos/<id>", "descripcion": "Eliminar producto (Admin)"},
-            {"metodo": "POST", "ruta": "/api/auth/registro", "descripcion": "Registro de clientes"},
-            {"metodo": "POST", "ruta": "/api/auth/login", "descripcion": "Inicio de sesión (retorna JWT)"},
-            {"metodo": "GET", "ruta": "/api/auth/perfil", "descripcion": "Perfil de usuario (Auth)"},
-            {"metodo": "POST", "ruta": "/api/pedidos", "descripcion": "Crear nuevo pedido (Auth)"},
-            {"metodo": "GET", "ruta": "/api/pedidos/mis-pedidos", "descripcion": "Historial de pedidos del cliente (Auth)"},
-            {"metodo": "GET", "ruta": "/api/pedidos", "descripcion": "Listar todos los pedidos (Admin)"}
+            {"metodo": metodo, "ruta": regla.rule}
+            for regla in app.url_map.iter_rules() if regla.endpoint != 'static'
+            for metodo in sorted(regla.methods - {'HEAD', 'OPTIONS'})
         ]
     }), 200
 
@@ -118,14 +245,14 @@ def status():
 @app.route('/api/auth/registro', methods=['POST'])
 def registro():
     try:
-        data = request.get_json() or {}
-        nombre = data.get('nombre', '').strip()
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '').strip()
-        telefono = data.get('telefono', '').strip()
-        direccion = data.get('direccion', '').strip()
+        data = datos_json()
+        nombre = texto(data, 'nombre', limite=100)
+        email = texto(data, 'email', limite=150).lower()
+        password = texto(data, 'password', recortar=False)
+        telefono = texto(data, 'telefono', limite=20)
+        direccion = texto(data, 'direccion')
 
-        if not nombre or not email or not password:
+        if not nombre or not email or not password.strip():
             return jsonify({
                 "status": "error",
                 "mensaje": "Los campos 'nombre', 'email' y 'password' son obligatorios."
@@ -136,6 +263,9 @@ def registro():
                 "status": "error",
                 "mensaje": "La contraseña debe tener al menos 6 caracteres."
             }), 400
+
+        if email.count('@') != 1 or any(c.isspace() for c in email) or not all(email.split('@')):
+            raise ValueError('El correo electrónico no es válido.')
 
         supabase = get_supabase_client()
 
@@ -153,7 +283,7 @@ def registro():
             'nombre': nombre,
             'email': email,
             'password_hash': password_hash,
-            'rol': 'CLIENTE',
+            'roles': ['CLIENTE'],
             'telefono': telefono if telefono else None,
             'direccion': direccion if direccion else None
         }
@@ -172,25 +302,27 @@ def registro():
                 "id": usuario_creado.get('id'),
                 "nombre": usuario_creado.get('nombre'),
                 "email": usuario_creado.get('email'),
-                "rol": usuario_creado.get('rol')
+                "roles": usuario_creado.get('roles')
             }
         }), 201
 
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/auth/registro]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al procesar el registro: {str(e)}"
+            "mensaje": "Error al procesar el registro. Consulte al administrador si el problema persiste."
         }), 500
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     try:
-        data = request.get_json() or {}
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '').strip()
+        data = datos_json()
+        email = texto(data, 'email', limite=150).lower()
+        password = texto(data, 'password', recortar=False)
 
-        if not email or not password:
+        if not email or not password.strip():
             return jsonify({
                 "status": "error",
                 "mensaje": "Debe proporcionar correo electrónico y contraseña."
@@ -219,11 +351,11 @@ def login():
             'usuario_id': usuario.get('id'),
             'nombre': usuario.get('nombre'),
             'email': usuario.get('email'),
-            'rol': usuario.get('rol'),
+            'roles': validar_roles(usuario.get('roles')),
             'exp': expiracion
         }
 
-        token = jwt.encode(payload, JWT_SECRET_KEY, algorithm='HS256')
+        token = jwt.encode(payload, clave_jwt(), algorithm='HS256')
 
         return jsonify({
             "status": "success",
@@ -233,17 +365,19 @@ def login():
                 "id": usuario.get('id'),
                 "nombre": usuario.get('nombre'),
                 "email": usuario.get('email'),
-                "rol": usuario.get('rol'),
+                "roles": usuario.get('roles'),
                 "telefono": usuario.get('telefono'),
                 "direccion": usuario.get('direccion')
             }
         }), 200
 
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/auth/login]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al procesar el inicio de sesión: {str(e)}"
+            "mensaje": "Error al procesar el inicio de sesión. Consulte al administrador si el problema persiste."
         }), 500
 
 @app.route('/api/auth/perfil', methods=['GET'])
@@ -252,7 +386,7 @@ def perfil(usuario_actual):
     try:
         supabase = get_supabase_client()
         resultado = supabase.table('usuarios')\
-            .select('id, nombre, email, rol, telefono, direccion, creado_en')\
+            .select('id, nombre, email, roles, telefono, direccion, creado_en')\
             .eq('id', usuario_actual['usuario_id'])\
             .execute()
 
@@ -267,11 +401,13 @@ def perfil(usuario_actual):
             "usuario": resultado.data[0]
         }), 200
 
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/auth/perfil]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al obtener perfil: {str(e)}"
+            "mensaje": "Error al obtener perfil. Consulte al administrador si el problema persiste."
         }), 500
 
 # ==========================================
@@ -282,11 +418,9 @@ def perfil(usuario_actual):
 def obtener_productos():
     try:
         supabase = get_supabase_client()
-        response = supabase.table('productos').select('*').execute()
+        response = supabase.table('productos').select('*,inventario(stock_actual)').eq('activo', True).order('id').limit(500).execute()
 
         productos = response.data or []
-        if productos and 'activo' in productos[0]:
-            productos = [p for p in productos if p.get('activo') is not False]
 
         return jsonify({
             "status": "success",
@@ -294,18 +428,20 @@ def obtener_productos():
             "data": productos
         }), 200
 
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/productos GET]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al consultar productos: {str(e)}"
+            "mensaje": "Error al consultar productos. Consulte al administrador si el problema persiste."
         }), 500
 
 @app.route('/api/productos/<int:producto_id>', methods=['GET'])
 def obtener_producto_detalle(producto_id):
     try:
         supabase = get_supabase_client()
-        response = supabase.table('productos').select('*').eq('id', producto_id).execute()
+        response = supabase.table('productos').select('*').eq('id', producto_id).eq('activo', True).execute()
 
         if not response.data or len(response.data) == 0:
             return jsonify({
@@ -318,24 +454,26 @@ def obtener_producto_detalle(producto_id):
             "data": response.data[0]
         }), 200
 
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/productos/<id> GET]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al consultar el producto: {str(e)}"
+            "mensaje": "Error al consultar el producto. Consulte al administrador si el problema persiste."
         }), 500
 
 @app.route('/api/productos', methods=['POST'])
 @token_requerido
-@admin_requerido
+@rol_requerido('ADMINISTRADOR')
 def crear_producto(usuario_actual):
     try:
-        data = request.get_json() or {}
-        nombre = data.get('nombre', '').strip()
-        descripcion = data.get('descripcion', '').strip()
+        data = datos_json()
+        nombre = texto(data, 'nombre', limite=100)
+        descripcion = texto(data, 'descripcion')
         precio = data.get('precio')
         categoria_id = data.get('categoria_id')
-        imagen = data.get('imagen', '').strip()
+        imagen = texto(data, 'imagen')
 
         if not nombre or precio is None:
             return jsonify({
@@ -343,15 +481,10 @@ def crear_producto(usuario_actual):
                 "mensaje": "Los campos 'nombre' y 'precio' son obligatorios."
             }), 400
 
-        try:
-            precio_num = float(precio)
-            if precio_num < 0:
-                raise ValueError()
-        except ValueError:
-            return jsonify({
-                "status": "error",
-                "mensaje": "El precio debe ser un número válido mayor o igual a 0."
-            }), 400
+        precio_num = precio_validado(precio)
+        if categoria_id is not None:
+            entero(categoria_id, 'categoria_id')
+        stock_inicial = entero(data.get('stock_inicial', 50), 'stock_inicial', minimo=0)
 
         supabase = get_supabase_client()
 
@@ -361,25 +494,18 @@ def crear_producto(usuario_actual):
             'precio': precio_num,
             'categoria_id': categoria_id if categoria_id else None,
             'imagen': imagen if imagen else 'https://placehold.co/400x300?text=Pizza',
-            'activo': True
+            'activo': True,
+            'tamano': texto(data, 'tamano', limite=40) or None
         }
 
-        resultado = supabase.table('productos').insert(nuevo_producto).execute()
-
-        if not resultado.data:
-            raise Exception("No se pudo insertar el producto en la base de datos.")
-
-        producto_creado = resultado.data[0]
-
-        stock_inicial = data.get('stock_inicial', 50)
-        try:
-            supabase.table('inventario').insert({
-                'producto_id': producto_creado['id'],
-                'stock_actual': int(stock_inicial),
-                'stock_minimo': 10
-            }).execute()
-        except Exception as inv_err:
-            print(f"[WARN] No se pudo inicializar inventario: {inv_err}")
+        # Producto e inventario se crean juntos; un fallo revierte ambos.
+        resultado = supabase.rpc('crear_producto_con_inventario', {
+            'p_producto': nuevo_producto,
+            'p_stock_inicial': stock_inicial
+        }).execute()
+        producto_creado = resultado.data
+        if not producto_creado:
+            raise RuntimeError("No se pudo crear el producto.")
 
         return jsonify({
             "status": "success",
@@ -387,19 +513,43 @@ def crear_producto(usuario_actual):
             "data": producto_creado
         }), 201
 
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/productos POST]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al crear producto: {str(e)}"
+            "mensaje": "Error al crear producto. Consulte al administrador si el problema persiste."
         }), 500
 
 @app.route('/api/productos/<int:producto_id>', methods=['PUT'])
 @token_requerido
-@admin_requerido
+@rol_requerido('ADMINISTRADOR')
 def actualizar_producto(usuario_actual, producto_id):
     try:
-        data = request.get_json() or {}
+        data = datos_json()
+        campos_actualizar = {}
+        for campo in ('nombre', 'descripcion', 'imagen', 'tamano'):
+            if campo in data:
+                campos_actualizar[campo] = texto(data, campo, obligatorio=campo == 'nombre',
+                                                limite=100 if campo == 'nombre' else 40 if campo == 'tamano' else None)
+        if 'precio' in data:
+            campos_actualizar['precio'] = precio_validado(data['precio'])
+        if 'categoria_id' in data:
+            categoria_id = data['categoria_id']
+            campos_actualizar['categoria_id'] = (entero(categoria_id, 'categoria_id')
+                                                 if categoria_id is not None else None)
+        if 'activo' in data:
+            if type(data['activo']) is not bool:
+                raise ValueError("El campo 'activo' debe ser booleano.")
+            campos_actualizar['activo'] = data['activo']
+
+        if not campos_actualizar:
+            return jsonify({
+                "status": "error",
+                "mensaje": "No se enviaron campos válidos para actualizar."
+            }), 400
+
         supabase = get_supabase_client()
 
         existente = supabase.table('productos').select('id').eq('id', producto_id).execute()
@@ -409,35 +559,6 @@ def actualizar_producto(usuario_actual, producto_id):
                 "mensaje": "El producto no existe."
             }), 404
 
-        campos_actualizar = {}
-        if 'nombre' in data and data['nombre'].strip():
-            campos_actualizar['nombre'] = data['nombre'].strip()
-        if 'descripcion' in data:
-            campos_actualizar['descripcion'] = data['descripcion'].strip()
-        if 'precio' in data:
-            try:
-                precio_num = float(data['precio'])
-                if precio_num < 0:
-                    raise ValueError()
-                campos_actualizar['precio'] = precio_num
-            except ValueError:
-                return jsonify({
-                    "status": "error",
-                    "mensaje": "El precio debe ser un número positivo."
-                }), 400
-        if 'categoria_id' in data:
-            campos_actualizar['categoria_id'] = data['categoria_id']
-        if 'imagen' in data:
-            campos_actualizar['imagen'] = data['imagen'].strip()
-        if 'activo' in data:
-            campos_actualizar['activo'] = bool(data['activo'])
-
-        if not campos_actualizar:
-            return jsonify({
-                "status": "error",
-                "mensaje": "No se enviaron campos válidos para actualizar."
-            }), 400
-
         resultado = supabase.table('productos').update(campos_actualizar).eq('id', producto_id).execute()
 
         return jsonify({
@@ -446,16 +567,18 @@ def actualizar_producto(usuario_actual, producto_id):
             "data": resultado.data[0] if resultado.data else {}
         }), 200
 
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/productos/<id> PUT]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al actualizar el producto: {str(e)}"
+            "mensaje": "Error al actualizar el producto. Consulte al administrador si el problema persiste."
         }), 500
 
 @app.route('/api/productos/<int:producto_id>', methods=['DELETE'])
 @token_requerido
-@admin_requerido
+@rol_requerido('ADMINISTRADOR')
 def eliminar_producto(usuario_actual, producto_id):
     try:
         supabase = get_supabase_client()
@@ -473,11 +596,13 @@ def eliminar_producto(usuario_actual, producto_id):
             "mensaje": f"Producto ID {producto_id} desactivado del catálogo correctamente."
         }), 200
 
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/productos/<id> DELETE]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al eliminar producto: {str(e)}"
+            "mensaje": "Error al eliminar producto. Consulte al administrador si el problema persiste."
         }), 500
 
 # ==========================================
@@ -486,146 +611,303 @@ def eliminar_producto(usuario_actual, producto_id):
 
 @app.route('/api/pedidos', methods=['POST'])
 @token_requerido
+@rol_requerido('CLIENTE')
 def crear_pedido(usuario_actual):
     try:
-        data = request.get_json() or {}
-        direccion_entrega = data.get('direccion_entrega', '').strip()
-        telefono_contacto = data.get('telefono_contacto', '').strip()
-        metodo_pago = data.get('metodo_pago', 'EFECTIVO').strip().upper()
-        items = data.get('items', [])
+        data = datos_json()
+        direccion_entrega = texto(data, 'direccion_entrega', obligatorio=True)
+        telefono_contacto = texto(data, 'telefono_contacto', limite=20)
+        metodo_pago = metodo_validado(data) if 'metodo_pago' in data else 'EFECTIVO'
+        items = items_validados(data.get('items'))
 
-        if not direccion_entrega:
-            return jsonify({
-                "status": "error",
-                "mensaje": "La dirección de entrega es obligatoria."
-            }), 400
-
-        if not items or not isinstance(items, list) or len(items) == 0:
-            return jsonify({
-                "status": "error",
-                "mensaje": "El pedido debe contener al menos un producto en 'items'."
-            }), 400
-
-        total_calculado = 0.0
-        detalles_preparados = []
-        supabase = get_supabase_client()
-
-        for item in items:
-            producto_id = item.get('producto_id')
-            cantidad = item.get('cantidad', 0)
-
-            if not producto_id or cantidad <= 0:
-                return jsonify({
-                    "status": "error",
-                    "mensaje": "Cada ítem debe tener un 'producto_id' válido y cantidad > 0."
-                }), 400
-
-            producto_bd = supabase.table('productos').select('precio, activo').eq('id', producto_id).execute()
-
-            if not producto_bd.data or len(producto_bd.data) == 0:
-                return jsonify({
-                    "status": "error",
-                    "mensaje": f"El producto con ID {producto_id} no existe."
-                }), 400
-
-            precio_real = float(producto_bd.data[0]['precio'])
-            subtotal = round(cantidad * precio_real, 2)
-            total_calculado += subtotal
-
-            detalles_preparados.append({
-                'producto_id': producto_id,
-                'cantidad': cantidad,
-                'precio_unitario': precio_real,
-                'subtotal': subtotal
-            })
-
-        total_calculado = round(total_calculado, 2)
-
-        nuevo_pedido = {
-            'usuario_id': usuario_actual['usuario_id'],
-            'total': total_calculado,
-            'direccion_entrega': direccion_entrega,
-            'telefono_contacto': telefono_contacto if telefono_contacto else None,
-            'metodo_pago': metodo_pago,
-            'estado': 'PENDIENTE'
-        }
-
-        res_pedido = supabase.table('pedidos').insert(nuevo_pedido).execute()
-        if not res_pedido.data or len(res_pedido.data) == 0:
-            raise Exception("No se pudo registrar la cabecera del pedido en la base de datos.")
-
-        pedido_creado = res_pedido.data[0]
-        pedido_id = pedido_creado['id']
-
-        for detalle in detalles_preparados:
-            detalle['pedido_id'] = pedido_id
-
-        res_detalles = supabase.table('detalle_pedidos').insert(detalles_preparados).execute()
-
+        # PostgreSQL valida disponibilidad, calcula precios y descuenta stock
+        # en una sola transacción, incluso cuando llegan compras simultáneas.
+        resultado = get_supabase_client().rpc('crear_pedido_atomico', {
+            'p_usuario_id': usuario_actual['usuario_id'],
+            'p_direccion_entrega': direccion_entrega,
+            'p_telefono_contacto': telefono_contacto or None,
+            'p_metodo_pago': metodo_pago,
+            'p_items': items
+        }).execute()
+        if not resultado.data:
+            raise RuntimeError("No se pudo registrar el pedido.")
+        notificar_pedido(resultado.data['pedido'], get_supabase_client)
         return jsonify({
             "status": "success",
             "mensaje": "Pedido registrado exitosamente.",
-            "data": {
-                "pedido": pedido_creado,
-                "detalles": res_detalles.data
-            }
+            "data": resultado.data
         }), 201
 
+    except APIError as e:
+        if e.code == 'P0001':
+            return jsonify({"status": "error", "mensaje": e.message}), 400
+        app.logger.exception("Error de base de datos al crear pedido")
+        return jsonify({"status": "error", "mensaje": "No se pudo registrar el pedido."}), 500
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/pedidos POST]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al procesar el pedido: {str(e)}"
+            "mensaje": "Error al procesar el pedido. Consulte al administrador si el problema persiste."
         }), 500
 
 @app.route('/api/pedidos/mis-pedidos', methods=['GET'])
 @token_requerido
+@rol_requerido('CLIENTE')
 def mis_pedidos(usuario_actual):
     try:
         supabase = get_supabase_client()
-        resultado = supabase.table('pedidos')\
-            .select('id, fecha_pedido, estado, total, direccion_entrega, metodo_pago, detalle_pedidos(*, productos(nombre, imagen))')\
-            .eq('usuario_id', usuario_actual['usuario_id'])\
-            .order('fecha_pedido', desc=True)\
-            .execute()
+        consulta = supabase.table('pedidos').select(
+            'id,fecha_pedido,estado,total,direccion_entrega,metodo_pago,detalle_pedidos(*)'
+        ).eq('usuario_id', usuario_actual['usuario_id']).order('id', desc=True)
+        return pagina_consulta(consulta)
 
-        return jsonify({
-            "status": "success",
-            "total": len(resultado.data or []),
-            "data": resultado.data or []
-        }), 200
-
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/pedidos/mis-pedidos GET]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al consultar el historial de pedidos: {str(e)}"
+            "mensaje": "Error al consultar el historial de pedidos. Consulte al administrador si el problema persiste."
         }), 500
 
 @app.route('/api/pedidos', methods=['GET'])
 @token_requerido
-@admin_requerido
+@rol_requerido('ADMINISTRADOR', 'VENDEDOR')
 def listar_todos_los_pedidos(usuario_actual):
     try:
         supabase = get_supabase_client()
-        resultado = supabase.table('pedidos')\
-            .select('id, fecha_pedido, estado, total, direccion_entrega, metodo_pago, usuarios(nombre, email), detalle_pedidos(*, productos(nombre))')\
-            .order('fecha_pedido', desc=True)\
-            .execute()
+        consulta = supabase.table('pedidos').select(
+            '*,usuarios(nombre,email),detalle_pedidos(*),ventas(id,metodo_pago,total)'
+        ).order('id', desc=True)
+        return pagina_consulta(consulta)
 
-        return jsonify({
-            "status": "success",
-            "total": len(resultado.data or []),
-            "data": resultado.data or []
-        }), 200
-
+    except ValueError as e:
+        return jsonify({"status": "error", "mensaje": str(e)}), 400
     except Exception as e:
         print(f"[ERROR /api/pedidos GET]: {str(e)}")
         return jsonify({
             "status": "error",
-            "mensaje": f"Error al consultar pedidos globales: {str(e)}"
+            "mensaje": "Error al consultar pedidos globales. Consulte al administrador si el problema persiste."
         }), 500
+
+# ==========================================
+# OPERACIÓN: ADMINISTRADOR Y VENDEDOR
+# ==========================================
+
+@app.get('/api/admin/productos')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def productos_admin(usuario_actual):
+    return pagina_consulta(get_supabase_client().table('productos').select('*').order('id'))
+
+
+@app.get('/api/categorias')
+@errores_api
+def categorias_publicas():
+    resultado = get_supabase_client().table('categorias').select('*').eq('activo', True).order('nombre').execute()
+    return jsonify({'status': 'success', 'data': resultado.data or []})
+
+
+@app.get('/api/admin/categorias')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def categorias_admin(usuario_actual):
+    return pagina_consulta(get_supabase_client().table('categorias').select('*').order('id'))
+
+
+@app.route('/api/categorias', methods=['POST'])
+@app.route('/api/categorias/<int:categoria_id>', methods=['PUT', 'DELETE'])
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def guardar_categoria(usuario_actual, categoria_id=None):
+    db = get_supabase_client()
+    if request.method == 'DELETE':
+        resultado = db.table('categorias').update({'activo': False}).eq('id', categoria_id).execute()
+    else:
+        data = datos_json()
+        campos = {'nombre': texto(data, 'nombre', obligatorio=True, limite=50),
+                  'descripcion': texto(data, 'descripcion')}
+        if 'activo' in data:
+            if type(data['activo']) is not bool:
+                raise ValueError('Activo debe ser booleano.')
+            campos['activo'] = data['activo']
+        if categoria_id is None:
+            resultado = db.table('categorias').insert(campos).execute()
+        else:
+            resultado = db.table('categorias').update(campos).eq('id', categoria_id).execute()
+    if not resultado.data:
+        return jsonify({'status': 'error', 'mensaje': 'Categoría no encontrada.'}), 404
+    return jsonify({'status': 'success', 'data': resultado.data[0]}), 201 if categoria_id is None else 200
+
+
+@app.get('/api/inventario')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def listar_inventario(usuario_actual):
+    # Incluye productos sin inventario para que puedan inicializarse formalmente.
+    return pagina_consulta(get_supabase_client().table('productos').select(
+        'id,nombre,tamano,activo,inventario(stock_actual,stock_minimo,actualizado_en)').order('id'))
+
+
+@app.put('/api/inventario/<int:producto_id>')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def guardar_inventario(usuario_actual, producto_id):
+    data = datos_json()
+    esperado = data.get('stock_esperado')
+    if esperado is not None:
+        esperado = entero(esperado, 'stock_esperado', minimo=0)
+    resultado = get_supabase_client().rpc('ajustar_inventario', {
+        'p_producto': producto_id, 'p_stock': entero(data.get('stock_actual'), 'stock_actual', minimo=0),
+        'p_minimo': entero(data.get('stock_minimo'), 'stock_minimo', minimo=0), 'p_esperado': esperado
+    }).execute()
+    fila = resultado.data
+    notificar_stock([fila])
+    return jsonify({'status': 'success', 'data': fila})
+
+
+@app.put('/api/pedidos/<int:pedido_id>/estado')
+@token_requerido
+@rol_requerido('ADMINISTRADOR', 'VENDEDOR')
+@errores_api
+def cambiar_estado(usuario_actual, pedido_id):
+    estado = texto(datos_json(), 'estado', obligatorio=True)
+    if estado not in ('EN_PREPARACION', 'EN_CAMINO', 'ENTREGADO', 'CANCELADO'):
+        raise ValueError('Estado inválido.')
+    resultado = get_supabase_client().rpc('cambiar_estado_pedido', {
+        'p_actor': usuario_actual['usuario_id'], 'p_pedido': pedido_id, 'p_estado': estado
+    }).execute()
+    return jsonify({'status': 'success', 'data': resultado.data})
+
+
+@app.post('/api/ventas')
+@token_requerido
+@rol_requerido('ADMINISTRADOR', 'VENDEDOR')
+@errores_api
+def crear_venta(usuario_actual):
+    data = datos_json()
+    metodo = metodo_validado(data)
+    if 'pedido_id' in data:
+        nombre = 'registrar_venta'
+        argumentos = {'p_actor': usuario_actual['usuario_id'],
+                      'p_pedido': entero(data['pedido_id'], 'pedido_id'), 'p_metodo': metodo}
+    else:
+        nombre = 'venta_directa'
+        argumentos = {'p_actor': usuario_actual['usuario_id'],
+                      'p_items': items_validados(data.get('items')), 'p_metodo': metodo}
+    resultado = get_supabase_client().rpc(nombre, argumentos).execute()
+    if nombre == 'venta_directa':
+        notificar_pedido({'id': resultado.data['pedido_id'], 'total': resultado.data['venta']['total'],
+                          'estado': 'ENTREGADO'}, get_supabase_client)
+    return jsonify({'status': 'success', 'data': resultado.data}), 201
+
+
+@app.get('/api/ventas')
+@token_requerido
+@rol_requerido('ADMINISTRADOR', 'VENDEDOR')
+@errores_api
+def listar_ventas(usuario_actual):
+    consulta = get_supabase_client().table('ventas').select('*,usuarios(nombre)').order('id', desc=True)
+    # El vendedor consulta sus ventas; el administrador puede consultar todas.
+    if 'ADMINISTRADOR' not in usuario_actual['roles']:
+        consulta = consulta.eq('vendedor_id', usuario_actual['usuario_id'])
+    return pagina_consulta(consulta)
+
+
+@app.get('/api/usuarios')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def listar_usuarios(usuario_actual):
+    return pagina_consulta(get_supabase_client().table('usuarios').select(
+        'id,nombre,email,roles,telefono,creado_en').order('id'))
+
+
+@app.put('/api/usuarios/<int:usuario_id>/roles')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def guardar_roles(usuario_actual, usuario_id):
+    roles = validar_roles(datos_json().get('roles'))
+    resultado = get_supabase_client().rpc('cambiar_roles', {
+        'p_actor': usuario_actual['usuario_id'], 'p_usuario': usuario_id, 'p_roles': roles
+    }).execute()
+    return jsonify({'status': 'success', 'data': resultado.data})
+
+
+def rango_reporte(desde=None, hasta=None):
+    hoy = datetime.datetime.now(ZoneInfo('America/La_Paz')).date()
+    try:
+        inicio = datetime.date.fromisoformat(desde) if desde else hoy - datetime.timedelta(days=6)
+        fin = datetime.date.fromisoformat(hasta) if hasta else hoy
+    except (TypeError, ValueError):
+        raise ValueError('Fechas inválidas; use AAAA-MM-DD.') from None
+    if fin < inicio or (fin - inicio).days > 365:
+        raise ValueError('El rango debe ser válido y no superar 366 días.')
+    zona = ZoneInfo('America/La_Paz')
+    return {'p_desde': datetime.datetime.combine(inicio, datetime.time.min, zona).isoformat(),
+            'p_hasta': datetime.datetime.combine(fin + datetime.timedelta(days=1), datetime.time.min, zona).isoformat()}
+
+
+@app.get('/api/reportes/ventas')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def reportes(usuario_actual):
+    resultado = get_supabase_client().rpc('reporte_ventas', rango_reporte(
+        request.args.get('desde'), request.args.get('hasta'))).execute()
+    return jsonify({'status': 'success', 'data': resultado.data})
+
+
+@app.get('/api/integraciones')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def estado_integraciones(usuario_actual):
+    from integrations import telegram_configurado
+    return jsonify({'status': 'success', 'data': {
+        'telegram': bool(telegram_configurado()),
+        'asistente': bool(os.getenv('ASSISTANT_ENABLED') == '1' and os.getenv('OPENAI_API_KEY') and os.getenv('OPENAI_MODEL'))
+    }})
+
+
+@app.post('/api/asistente')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def asistente(usuario_actual):
+    data = datos_json()
+    mensajes = data.get('mensajes')
+    if not isinstance(mensajes, list) or not 1 <= len(mensajes) <= 10:
+        raise ValueError('Envíe entre 1 y 10 mensajes.')
+    for mensaje in mensajes:
+        if not isinstance(mensaje, dict) or mensaje.get('role') not in ('user', 'assistant'):
+            raise ValueError('Mensaje inválido.')
+        texto(mensaje, 'content', obligatorio=True, limite=2000 if mensaje['role'] == 'user' else 10000)
+    if mensajes[-1]['role'] != 'user':
+        raise ValueError('El último mensaje debe ser del usuario.')
+    db = get_supabase_client()
+    herramientas = {
+        'consultar_catalogo': {'descripcion': 'Catálogo actual de hasta 100 opciones con tamaños y precios.',
+            'consultar': lambda: db.table('productos').select('id,nombre,tamano,precio,activo').order('id').limit(100).execute().data},
+        'consultar_inventario': {'descripcion': 'Stock y mínimos de hasta 100 productos.',
+            'consultar': lambda: db.table('inventario').select('stock_actual,stock_minimo,productos(nombre,tamano)').order('producto_id').limit(100).execute().data},
+        'consultar_ventas': {'descripcion': 'Ventas cobradas y consumo de productos en los últimos siete días.',
+            'consultar': lambda: db.rpc('reporte_ventas', rango_reporte()).execute().data}
+    }
+    try:
+        respuesta = responder_asistente(mensajes, herramientas)
+    except RuntimeError as error:
+        return jsonify({'status': 'error', 'mensaje': str(error)}), 503
+    return jsonify({'status': 'success', 'respuesta': respuesta})
 
 if __name__ == '__main__':
     puerto = int(os.getenv('PORT', 5000))
-    app.run(debug=True, port=puerto)
+    app.run(debug=os.getenv('FLASK_DEBUG') == '1', port=puerto)

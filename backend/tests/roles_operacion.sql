@@ -1,0 +1,63 @@
+BEGIN;
+DO $$
+DECLARE
+ a INTEGER; v INTEGER; c INTEGER; familiar INTEGER; mediana INTEGER; pedido INTEGER; r JSONB; fallo BOOLEAN;
+BEGIN
+ INSERT INTO usuarios(nombre,email,password_hash,roles) VALUES('Admin','a-'||txid_current()||'@test.invalid','hash',ARRAY['ADMINISTRADOR']) RETURNING id INTO a;
+ INSERT INTO usuarios(nombre,email,password_hash,roles) VALUES('Vendedor','v-'||txid_current()||'@test.invalid','hash',ARRAY['VENDEDOR']) RETURNING id INTO v;
+ INSERT INTO usuarios(nombre,email,password_hash,roles) VALUES('Cliente','c-'||txid_current()||'@test.invalid','hash',ARRAY['CLIENTE']) RETURNING id INTO c;
+ -- Dejar un único administrador dentro de esta transacción de pruebas.
+ UPDATE usuarios SET roles=ARRAY['CLIENTE'] WHERE id<>a AND 'ADMINISTRADOR'=ANY(roles);
+ fallo:=FALSE;
+ BEGIN PERFORM cambiar_roles(a,a,ARRAY['CLIENTE']); EXCEPTION WHEN SQLSTATE 'P0001' THEN fallo:=TRUE; END;
+ IF NOT fallo THEN RAISE EXCEPTION 'Se quitó el último administrador'; END IF;
+ IF has_table_privilege('anon','public.usuarios','SELECT') OR has_table_privilege('authenticated','public.ventas','INSERT') THEN
+    RAISE EXCEPTION 'Tablas operativas permiten acceso directo público';
+ END IF;
+ PERFORM cambiar_roles(a,c,ARRAY['CLIENTE','VENDEDOR']);
+ IF NOT (SELECT roles @> ARRAY['CLIENTE','VENDEDOR'] FROM usuarios WHERE id=c) THEN RAISE EXCEPTION 'Combinación no guardada'; END IF;
+ fallo:=FALSE;
+ BEGIN PERFORM cambiar_roles(v,c,ARRAY['ADMINISTRADOR']); EXCEPTION WHEN SQLSTATE 'P0001' THEN fallo:=TRUE; END;
+ IF NOT fallo THEN RAISE EXCEPTION 'Vendedor asignó roles'; END IF;
+ r:=crear_producto_con_inventario('{"nombre":"Pizza test","precio":20,"tamano":"Familiar"}',10); familiar:=(r->>'id')::INTEGER;
+ r:=crear_producto_con_inventario('{"nombre":"Pizza test","precio":12,"tamano":"Mediana"}',5); mediana:=(r->>'id')::INTEGER;
+ r:=crear_pedido_atomico(c,'Calle',NULL,'QR',jsonb_build_array(jsonb_build_object('producto_id',familiar,'cantidad',2),jsonb_build_object('producto_id',mediana,'cantidad',1)));
+ pedido:=(r->'pedido'->>'id')::INTEGER;
+ IF (r->'pedido'->>'total')::NUMERIC<>52 OR (SELECT stock_actual FROM inventario WHERE producto_id=familiar)<>8 OR (SELECT stock_actual FROM inventario WHERE producto_id=mediana)<>4 THEN RAISE EXCEPTION 'Precio o stock por tamaño incorrecto'; END IF;
+ UPDATE productos SET nombre='Nombre nuevo',tamano='Otro' WHERE id=familiar;
+ IF (SELECT nombre_producto FROM detalle_pedidos WHERE pedido_id=pedido AND producto_id=familiar)<>'Pizza test' OR (SELECT tamano FROM detalle_pedidos WHERE pedido_id=pedido AND producto_id=familiar)<>'Familiar' THEN RAISE EXCEPTION 'Snapshot perdido'; END IF;
+ fallo:=FALSE;
+ BEGIN PERFORM cambiar_estado_pedido(v,pedido,'ENTREGADO'); EXCEPTION WHEN SQLSTATE 'P0001' THEN fallo:=TRUE; END;
+ IF NOT fallo THEN RAISE EXCEPTION 'Se saltó el flujo de estados'; END IF;
+ IF NOT (SELECT stock_descontado FROM pedidos WHERE id=pedido) THEN RAISE EXCEPTION 'No se marcó el descuento'; END IF;
+ PERFORM cambiar_estado_pedido(v,pedido,'EN_PREPARACION');
+ PERFORM cambiar_estado_pedido(v,pedido,'CANCELADO');
+ PERFORM cambiar_estado_pedido(v,pedido,'CANCELADO');
+ IF (SELECT stock_actual FROM inventario WHERE producto_id=familiar)<>10 OR (SELECT stock_actual FROM inventario WHERE producto_id=mediana)<>5 THEN RAISE EXCEPTION 'Devolución de stock incorrecta'; END IF;
+ fallo:=FALSE;
+ BEGIN PERFORM cambiar_estado_pedido(v,pedido,'EN_PREPARACION'); EXCEPTION WHEN SQLSTATE 'P0001' THEN fallo:=TRUE; END;
+ IF NOT fallo THEN RAISE EXCEPTION 'Se reabrió pedido cancelado'; END IF;
+ r:=venta_directa(v,jsonb_build_array(jsonb_build_object('producto_id',mediana,'cantidad',2)),'EFECTIVO'); pedido:=(r->>'pedido_id')::INTEGER;
+ IF (SELECT total FROM ventas WHERE pedido_id=pedido)<>24 THEN RAISE EXCEPTION 'Importe de venta incorrecto'; END IF;
+ fallo:=FALSE;
+ BEGIN PERFORM registrar_venta(v,pedido,'QR'); EXCEPTION WHEN SQLSTATE 'P0001' THEN fallo:=TRUE; END;
+ IF NOT fallo THEN RAISE EXCEPTION 'Cobro duplicado'; END IF;
+ fallo:=FALSE;
+ BEGIN PERFORM venta_directa(v,jsonb_build_array(jsonb_build_object('producto_id',mediana,'cantidad',1)),'INVALIDO'); EXCEPTION WHEN SQLSTATE 'P0001' THEN fallo:=TRUE; END;
+ IF NOT fallo OR (SELECT stock_actual FROM inventario WHERE producto_id=mediana)<>3 THEN RAISE EXCEPTION 'Venta fallida no revertida'; END IF;
+ fallo:=FALSE;
+ BEGIN PERFORM ajustar_inventario(mediana,20,5,5); EXCEPTION WHEN SQLSTATE 'P0001' THEN fallo:=TRUE; END;
+ IF NOT fallo THEN RAISE EXCEPTION 'Stock concurrente sobrescrito'; END IF;
+ PERFORM ajustar_inventario(mediana,20,5,3);
+ r:=reporte_ventas(CURRENT_TIMESTAMP-INTERVAL '1 hour',CURRENT_TIMESTAMP+INTERVAL '1 hour');
+ IF (r->>'total')::NUMERIC<24 THEN RAISE EXCEPTION 'Venta falta en reporte'; END IF;
+ INSERT INTO pedidos(usuario_id,total,direccion_entrega) VALUES(c,0,'Pedido anterior') RETURNING id INTO pedido;
+ fallo:=FALSE;
+ BEGIN PERFORM cambiar_estado_pedido(v,pedido,'CANCELADO'); EXCEPTION WHEN SQLSTATE 'P0001' THEN fallo:=TRUE; END;
+ IF NOT fallo THEN RAISE EXCEPTION 'Se canceló un pedido anterior sin conciliar stock'; END IF;
+ UPDATE pedidos SET stock_descontado=FALSE WHERE id=pedido;
+ PERFORM cambiar_estado_pedido(v,pedido,'CANCELADO');
+ RAISE NOTICE 'Roles, tamaños, estados, cancelación, cobros y reportes: correctos.';
+END;
+$$;
+ROLLBACK;

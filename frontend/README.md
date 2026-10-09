@@ -1,16 +1,27 @@
-# React + Vite
+# Frontend de Pizzería Muñeco
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite + JavaScript, Bootstrap y React Bootstrap, React Router, Axios y
+Context API. Node y pnpm son necesarios.
 
-Currently, two official plugins are available:
+1. Ejecutar `pnpm install` dentro de `frontend/`.
+2. Copiar `.env.example` a `.env` y ajustar `VITE_API_URL` si Flask no está en
+   `http://localhost:5000`. Reiniciar Vite después de cambiar esa variable.
+3. Ejecutar `pnpm dev` y abrir la dirección que imprime Vite.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+`pnpm lint` revisa el código; `pnpm build` genera `dist/`.
 
-## React Compiler
+Rutas públicas: inicio, catálogo, carrito, login y registro.
+CLIENTE tiene `/mis-pedidos` y confirmación de compra desde el carrito.
+VENDEDOR y ADMINISTRADOR acceden a `/operacion` y `/operacion/ventas`.
+Las demás secciones del panel requieren ADMINISTRADOR.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+La sesión y el carrito se conservan en `sessionStorage` durante la pestaña.
+Cerrar sesión elimina el token y vacía el carrito. Un 401 autenticado cierra la
+sesión; un 403 actualiza los permisos. Flask decide el acceso a cada operación,
+aunque alguien cambie el JavaScript o los datos almacenados del navegador.
 
-## Expanding the ESLint configuration
+El tamaño elegido identifica una opción de producto con precio/stock propios.
+El total del carrito es estimado: PostgreSQL recalcula el pedido con precios reales.
+Los pagos son registros operativos; la aplicación no cobra mediante pasarelas.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Las pruebas de navegador están en `tests/`; instrucciones en `backend/README.md`.

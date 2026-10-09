@@ -3,11 +3,15 @@ import Button from 'react-bootstrap/Button'
 import Row from 'react-bootstrap/Row'
 import Col from 'react-bootstrap/Col'
 import Card from 'react-bootstrap/Card'
-import products from '../data/products'
+import Alert from 'react-bootstrap/Alert'
+import Spinner from 'react-bootstrap/Spinner'
+import useProductos from '../hooks/useProductos'
+import { agruparProductos } from '../utils/formato'
 
 function Home() {
-  // Tomamos los primeros 3 productos como muestra para la sección de populares
-  const productosPopulares = products.slice(0, 3)
+  const { productos, cargando, error, reintentarCarga } = useProductos()
+  // Vitrina de tres productos del catálogo real.
+  const productosPopulares = agruparProductos(productos).slice(0, 3).map((grupo) => grupo[0])
 
   return (
     <div className="pb-5">
@@ -75,13 +79,23 @@ function Home() {
             Ver todas
           </Button>
         </div>
-        <Row xs={1} md={3} className="g-4">
+        {cargando && <Spinner animation="border" role="status"><span className="visually-hidden">Cargando productos...</span></Spinner>}
+        {!cargando && error && (
+          <Alert variant="danger">
+            <p>{error}</p>
+            <Button variant="outline-danger" onClick={reintentarCarga}>Reintentar</Button>
+          </Alert>
+        )}
+        {!cargando && !error && productos.length === 0 && (
+          <Alert variant="info">No hay productos disponibles en este momento.</Alert>
+        )}
+        {!cargando && !error && <Row xs={1} md={3} className="g-4">
           {productosPopulares.map((producto) => (
             <Col key={producto.id}>
               <Card className="h-100 shadow-sm">
                 <Card.Img variant="top" src={producto.imagen} alt={producto.nombre} />
                 <Card.Body className="d-flex flex-column">
-                  <Card.Title className="fw-bold">{producto.nombre}</Card.Title>
+                  <Card.Title className="fw-bold">{producto.nombre}{producto.tamano ? ` (${producto.tamano})` : ''}</Card.Title>
                   <Card.Text className="text-muted flex-grow-1">
                     {producto.descripcion}
                   </Card.Text>
@@ -94,7 +108,7 @@ function Home() {
               </Card>
             </Col>
           ))}
-        </Row>
+        </Row>}
       </section>
     </div>
   )

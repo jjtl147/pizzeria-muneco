@@ -1,125 +1,188 @@
-# Planificación Scrum — Sistema Web para Pizzería
-**Proyecto de titulación — Ingeniería de Sistemas**
+# Planificación Scrum — Sistema Web para Pizzería Muñeco
 
-**Fecha de inicio de planificación:** 4 de septiembre de 2026
-**Fecha objetivo de entrega (MVP completo):** 10 de noviembre de 2026
-**Duración total:** 67 días (~9.5 semanas)
+Proyecto de titulación — Ingeniería de Sistemas.
+Inicio: 4 de septiembre de 2026. Entrega objetivo: 10 de noviembre de 2026.
+Estado revisado: 9 de octubre de 2026.
 
-> Nota: la fecha límite se ajustó de 20 al 10 de noviembre de 2026, por lo que
-> los sprints posteriores al Sprint 1 se comprimieron de 14 a 12 días, y el
-> buffer final se redujo de 7 a 5 días, manteniendo el mismo alcance funcional.
+## Criterio de avance
 
----
+Una casilla marcada significa implementación disponible en el repositorio, con
+las comprobaciones locales indicadas. El cierre de un sprint requiere además
+validación integrada en Supabase y aceptación de sus flujos. No se equipara
+código implementado con despliegue o servicio externo operativo.
 
-## Fase 0 — Configuración inicial y funcionalidades base (previo al inicio formal de Scrum)
+## Resumen de avance
 
-Antes de adoptar la metodología Scrum de forma estructurada, se desarrollaron las siguientes funcionalidades base, registradas en el historial de control de versiones (Git/GitHub):
+| Área | Estado |
+|---|---|
+| Vistas base, rutas, catálogo y carrito | Implementadas |
+| API Flask, Supabase y esquema inicial | Implementados |
+| Login, registro, sesión y pedidos del cliente con Axios | Implementados; validar con Supabase |
+| Roles combinables y tamaños con precio/stock propios | Migración y código preparados |
+| Panel del vendedor: pedidos, ventas y tipo de pago | Implementado; validar con Supabase |
+| Panel del administrador: productos, categorías, inventario, usuarios y roles | Implementado; validar con Supabase |
+| Reportes de ventas, estadísticas y consumo de productos | Implementados; validar con Supabase |
+| Telegram y asistente LLM con herramientas de lectura | Código preparado; faltan credenciales y pruebas con servicios reales |
 
-- Inicialización del proyecto frontend (React + Vite + pnpm)
-- Configuración de Bootstrap y React Bootstrap
-- Estructura de rutas con React Router (Home, Catálogo, Carrito, Login)
-- Diseño del layout base (Navbar + Outlet)
-- Implementación del catálogo de productos con datos de ejemplo (mock data)
-- Implementación del carrito de compras funcional, utilizando el patrón
-  Context API de React (Context + Provider + hook useContext) para el
-  manejo de estado global sin necesidad de librerías externas (Redux/Zustand),
-  en línea con las restricciones de arquitectura definidas para el proyecto
-- Configuración de control de versiones (Git) y repositorio remoto en GitHub
-- Migración del entorno de desarrollo de Windows a Linux (Pop!_OS)
+La conexión por Axios incluye ahora catálogo, autenticación, pedidos y paneles.
+Verificación local: 27 pruebas Python, scripts SQL y recorrido completo de navegador
+aprobados; ESLint y compilación correctos.
 
-Esta fase corresponde al periodo previo al 4 de septiembre de 2026, y su
-evidencia de desarrollo se encuentra documentada en el historial de commits
-del repositorio.
+Las pruebas locales no sustituyen la comprobación de las políticas, las claves
+ni el esquema del proyecto Supabase del estudiante.
 
----
+### Qué está hecho y qué falta comprobar
 
-## Resumen de avance del proyecto
+- [x] Panel de administración: productos, categorías, inventario, usuarios y roles.
+- [x] Panel de informes/dashboard: indicadores de ventas, filtros, tablas y exportación CSV.
+- [x] Interfaz y backend del asistente virtual para el administrador.
+- [ ] Configurar el proveedor/modelo y probar respuestas reales del asistente.
+- [ ] Configurar Telegram y comprobar las notificaciones reales.
+- [ ] Validar los paneles y el flujo de compra con el Supabase del proyecto.
 
-### Frontend
-| Módulo | Estado | % |
-|---|---|---|
-| Estructura base (Vite, rutas, navbar) | Completo | 100% |
-| Catálogo de productos (mock data) | Completo | 100% |
-| Carrito de compras (Context API) | Completo | 100% |
-| Página Home (contenido visual completo) | Completo | 100% |
-| Página Login (formulario visual completo) | Completo | 100% |
-| Conexión a backend real (Axios) | Pendiente (Sprint 2) | 0% |
+El panel de administración se abre con una cuenta ADMINISTRADOR desde
+`/operacion`; sus pestañas incluyen productos, categorías, inventario y usuarios.
+El dashboard está en `/operacion/reportes` y el asistente en
+`/operacion/asistente`. Estos paneles ya tienen implementación; las tareas
+pendientes corresponden a configuración externa y aceptación en el entorno real.
 
-**Frontend total (fase cliente): ~80%**
+## Decisión de diseño: roles combinables
 
-### Backend
-| Módulo | Estado | % |
-|---|---|---|
-| Estructura Flask (entorno virtual, app.py, CORS) | Completo | 100% |
-| Conexión a Supabase/PostgreSQL (.env) | Completo | 100% |
-| Esquema de base de datos relacional (schema.sql) | Completo | 100% |
-| API REST CRUD Productos (GET, POST, PUT, DELETE) | Completo | 100% |
-| Módulo de Pedidos (POST /api/pedidos, historial) | Completo | 100% |
-| Autenticación y roles con JWT + Hashing | Completo | 100% |
+Se utiliza `usuarios.roles`, un arreglo PostgreSQL con uno o varios valores de
+CLIENTE, VENDEDOR y ADMINISTRADOR. La migración copia el rol de cada usuario
+existente. La columna antigua `rol` se conserva como dato heredado; el código
+nuevo no la utiliza para autorizar.
 
-**Backend total: ~75%**
+El JWT incluye una lista de roles. Flask consulta el usuario vigente en cada
+solicitud protegida: quitar un rol tiene efecto aunque el JWT no haya expirado.
+`rol_requerido(...)` permite el acceso cuando coincide al menos un rol.
+Los tokens anteriores con `rol` único requieren iniciar sesión nuevamente.
 
-### Avance general estimado del proyecto: ~50%
+| Permiso | CLIENTE | VENDEDOR | ADMINISTRADOR |
+|---|---|---|---|
+| Consultar catálogo | Sí | Sí | Sí |
+| Pedidos personales desde carrito e historial propio | Sí | Con CLIENTE | Con CLIENTE |
+| Consultar y cambiar estado de pedidos | No | Sí | Sí |
+| Registrar ventas y método de pago | No | Sí | Sí |
+| Consultar ventas registradas | No | Propias | Todas |
+| Productos, categorías e inventario | No | No | Sí |
+| Usuarios y asignación de roles | No | No | Sí |
+| Reportes y consumo semanal de productos | No | No | Sí |
+| Telegram y asistente | No | No | Sí |
 
----
+## Fase 0 — Base previa a Scrum
 
-## Sprints planificados
+React 19, Vite, pnpm, Bootstrap, React Bootstrap, React Router y Context API.
+Catálogo inicial con datos de ejemplo, carrito, Git y migración a Linux.
+El backend usa Python, Flask y PostgreSQL mediante Supabase. Se conserva este stack.
 
-### Sprint 1 — 4 al 18 de septiembre (COMPLETADO ✅)
-**Objetivo:** Cerrar frontend cliente base + iniciar backend
+## Sprint 1 — 4 al 18 de septiembre
 
-- [x] Completar Home y Login (contenido visual completo)
-- [x] Estructura de carpetas Flask (app/, routes/, models/) — versión inicial simple (app.py) con entorno virtual y servidor de desarrollo funcional; se reorganizará en subcarpetas cuando la lógica del backend crezca
-- [x] Configurar conexión Flask ↔ Supabase (.env)
-- [x] Diseñar esquema de base de datos (usuarios, productos, categorías, pedidos, inventario)
-- [x] Endpoint GET /api/productos funcionando con datos reales
+Objetivo: cerrar vistas base del cliente e iniciar backend.
 
-### Sprint 2 — 18 al 30 de septiembre (COMPLETADO ✅)
-**Objetivo:** API REST funcional + autenticación backend
+- [x] Home y formulario visual de Login.
+- [x] Flask, CORS y entorno virtual.
+- [x] Configuración Supabase por variables de entorno.
+- [x] Esquema de usuarios, categorías, productos, inventario y pedidos.
+- [x] GET /api/productos.
 
-- [x] Endpoints CRUD de productos
-- [x] Endpoint POST /api/pedidos
-- [x] Reemplazar products.js mock por consumo real vía Axios
-- [x] Sistema de autenticación en Flask (JWT + hash de contraseñas)
-- [x] Endpoints POST /api/auth/registro y POST /api/auth/login
+Informe histórico: `INFORME_SPRINT_1.md`.
 
-### Sprint 3 — 30 de septiembre al 12 de octubre
-**Objetivo:** Autenticación funcional en frontend + pedidos del cliente
+## Sprint 2 — 18 al 30 de septiembre
 
-- [ ] Formulario de Login/Registro conectado al backend real
-- [ ] Manejo de sesión (token) y rutas protegidas en React Router
-- [ ] Página "Mis pedidos" (historial + estado)
-- [ ] Cerrar sesión funcional
+Objetivo: API REST de productos, pedidos y autenticación.
 
-### Sprint 4 — 12 al 24 de octubre
-**Objetivo:** Panel administrativo — gestión operativa
+- [x] CRUD de productos y desactivación lógica.
+- [x] Registro y login con contraseña hash y JWT.
+- [x] Perfil e historial del cliente.
+- [x] Creación de pedidos.
+- [x] Catálogo con Axios; Home también consume productos reales.
+- [x] Correcciones: validación, secreto JWT obligatorio y operaciones atómicas.
+- [x] Aplicar migración 001 en Supabase (ejecución informada por el estudiante).
+- [ ] Verificar pedidos e inventario en el Supabase real.
 
-- [ ] Script seed_admin.py para creación formal del administrador inicial (reemplaza la asignación manual de rol vía SQL usada durante pruebas)
-- [ ] Layout del panel admin (rutas protegidas para rol administrador)
-- [ ] CRUD visual de productos y categorías
-- [ ] Gestión de inventario (stock, alertas de stock bajo)
-- [ ] Gestión de pedidos (cambio de estados)
+## Sprint 3 — 2 al 14 de octubre
 
-### Sprint 5 — 24 de octubre al 5 de noviembre
-**Objetivo:** Reportes + integración con Telegram
+Objetivo: cliente conectado y autorización con roles combinables.
+Las correcciones de base cubren la transición después del Sprint 2.
 
-- [ ] Dashboard de ventas/estadísticas
-- [ ] Bot de Telegram: notificaciones (nuevo pedido, stock bajo), integrado directamente desde el backend en Flask
-- [ ] Asistente conversacional mediante modelo de lenguaje (LLM con function calling), consultando datos reales del backend
+- [x] Login y Registro conectados con Axios.
+- [x] Sesión, token, cierre de sesión y rutas protegidas.
+- [x] Confirmación de pedido desde carrito e historial propio.
+- [x] Preparar migración de roles combinables y usuarios existentes.
+- [x] JWT con roles y decorador `rol_requerido(...)`.
+- [x] Autorizar VENDEDOR para consultar pedidos y cambiar estados.
+- [x] RF-04: selección de tamaño, precio y stock independientes.
+- [ ] Confirmar ejecución correcta de migración 002 en Supabase.
+- [ ] Comprobar login de usuarios existentes con los nuevos roles.
+- [ ] Aceptar flujo completo de compra en el entorno real.
+- [ ] Conciliar si los pedidos anteriores descontaron stock antes de permitir su cancelación.
 
-### Buffer final — 5 al 10 de noviembre
-**Objetivo:** Estabilización y documentación
+## Sprint 4 — 14 al 26 de octubre
 
-- [ ] Pruebas de extremo a extremo
-- [ ] Corrección de errores encontrados
-- [ ] Preparación de documentación para sustentación
+Objetivo: gestión operativa del administrador y vendedor.
 
----
+- [x] `seed_admin.py` para el primer administrador.
+- [x] Panel operativo con permisos por rol.
+- [x] Productos y categorías: creación, edición y desactivación.
+- [x] Inventario por tamaño y alertas de stock bajo.
+- [x] Gestión de estados y cancelación con devolución única de stock.
+- [x] Panel del vendedor: pedidos, venta en local, registro de cobro y método de pago.
+- [x] Gestión de usuarios y asignación/quita de roles.
+- [x] Impedir quitar el último administrador y registrar cobros duplicados.
+- [ ] Validar la operación en Supabase con cuentas de cada rol.
 
-## Notas de metodología
+## Sprint 5 — 26 de octubre al 7 de noviembre
 
-Este proyecto sigue un enfoque Scrum adaptado para desarrollo individual:
-- Sprints de 2 semanas de duración
-- Revisión de avance al cierre de cada sprint, con reorganización del backlog siguiente según el progreso real
-- El backlog de cada sprint puede ajustarse; el Sprint Goal (objetivo general) se mantiene como guía principal
-- Funcionalidades no contempladas en este plan (mejoras post-MVP) se gestionan por separado, fuera del alcance de los 100% funcionales previstos para el 10 de noviembre
+Objetivo: reportes e integraciones.
+
+- [x] Dashboard de ventas cobradas, cantidad y promedio.
+- [x] Reportes por fecha, pago, producto y tamaño; descarga CSV.
+- [x] Consumo de productos del periodo (últimos siete días por defecto).
+- [x] Código de notificaciones Telegram: pedido nuevo y stock bajo.
+- [x] Código del asistente con LLM y function calling sobre datos reales.
+- [x] Asistente limitado a herramientas de lectura y rol ADMINISTRADOR.
+- [ ] Crear bot/chat y configurar/habilitar Telegram.
+- [ ] Elegir proveedor/modelo y configurar/habilitar el asistente. Se preparó una
+      opción con OpenAI Responses; cambiar proveedor requerirá su adaptador.
+- [ ] Comprobar entrega real de notificaciones y respuestas del LLM.
+
+## Buffer final — 7 al 10 de noviembre
+
+La ampliación de roles y el ajuste de fechas dejan tres días de estabilización.
+
+- [x] Pruebas locales de validación y autorización por rol y combinaciones.
+- [x] Pruebas SQL aisladas de transacciones, tamaños, estados y ventas.
+- [x] Flujo de navegador React → Axios → Flask → PostgreSQL aislado: cliente,
+      vendedor, administrador, catálogo, compra, cobros, CRUD, inventario y roles.
+- [ ] Completar aceptación de flujos de extremo a extremo en Supabase.
+- [ ] Probar compras simultáneas con conexiones PostgreSQL independientes.
+- [ ] Verificar notificaciones y asistente con servicios reales.
+- [ ] Revisar documentación académica, diagramas UML y casos de uso.
+- [ ] Ensayar la sustentación y registrar evidencias del sistema funcionando.
+
+## Pendientes técnicos y decisiones
+
+**RF-04 resuelto por el estudiante:** cada tamaño tiene precio y stock propios.
+Cada fila de `productos` es una opción vendible: por ejemplo, Pizza Margarita
+Mediana y Pizza Margarita Familiar tienen IDs distintos. Catálogo agrupa por
+nombre/categoría y permite elegir tamaño. Se conserva el modelo de inventario
+por producto y se guardan nombre/tamaño/precio en el detalle histórico del pedido.
+Los productos existentes sin tamaño conservan su ID y su disponibilidad.
+
+**Pagos:** EFECTIVO, QR y TARJETA son registros del método recibido; el sistema no
+procesa pagos bancarios. Un pedido entregado se convierte en venta al registrar
+su cobro. Una venta en local crea pedido, detalles, descuento y cobro juntos.
+
+**Consumo semanal:** mide unidades de productos de pedidos no cancelados. No se
+ha solicitado ni modelado un inventario de ingredientes o recetas.
+
+**Instalación:** aplicar 001 y 002 en orden; 002 se ejecuta una vez. No volver a
+crear las tablas de una base existente. Si 001 ya fue aplicada, ejecutar solo 002.
+Las migraciones y las integraciones externas no se ejecutan automáticamente.
+
+## Metodología
+
+Scrum adaptado al desarrollo individual: backlog ajustable, revisión por sprint,
+evidencias en Git y aceptación de flujos. La nueva planificación mantiene el
+10 de noviembre como objetivo; las casillas pendientes determinan el cierre real.

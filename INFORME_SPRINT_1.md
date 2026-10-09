@@ -1,7 +1,8 @@
 # Informe de Avance — Cierre del Sprint 1
 **Proyecto de Titulación — Ingeniería de Sistemas**  
 **Sistema Web para Pizzería Muñeco**  
-**Fecha:** 30 de septiembre de 2026  
+**Fecha de elaboración del informe:** 30 de septiembre de 2026
+**Periodo del Sprint 1:** 4 al 18 de septiembre de 2026
 **Estado:** Sprint 1 Completado al 100% ✅
 
 ---
@@ -76,10 +77,13 @@ Durante este sprint se cumplieron satisfactoriamente los dos ejes principales pl
 
 ---
 
-## 5. Próximos Pasos (Sprint 2: 18 al 30 de Septiembre)
+## 5. Próximos Pasos previstos al cierre (Sprint 2: 18 al 30 de septiembre)
 
 1. Implementar endpoints CRUD completos para productos en Flask.
 2. Crear endpoint `POST /api/pedidos` para procesamiento de compras.
 3. Conectar el catálogo del Frontend mediante peticiones HTTP reales usando **Axios**.
 4. Implementar el módulo de autenticación con JWT y hashing de contraseñas (`Werkzeug` / `bcrypt`).
 
+
+> Este informe describe el cierre del Sprint 1. Para el estado actual y las
+> correcciones del 9 de octubre, consultar `PLANIFICACION_SCRUM.md`.

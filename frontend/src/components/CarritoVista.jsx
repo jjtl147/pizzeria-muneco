@@ -1,6 +1,7 @@
 import Table from 'react-bootstrap/Table'
 import Button from 'react-bootstrap/Button'
 import Alert from 'react-bootstrap/Alert'
+import { nombreProducto } from '../utils/formato'
 
 /**
  * Componente visual para la vista del carrito de compras.
@@ -43,7 +44,7 @@ function CarritoVista({ items = [], eliminarDelCarrito, cambiarCantidad, totalPr
         <tbody>
           {items.map((item) => (
             <tr key={item.id} className="text-center">
-              <td className="text-start fw-semibold">{item.nombre}</td>
+              <td className="text-start fw-semibold">{nombreProducto(item)}</td>
               <td>${Number(item.precio).toFixed(2)}</td>
               <td>
                 <div className="d-flex justify-content-center align-items-center gap-2">

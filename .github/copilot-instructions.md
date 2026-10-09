@@ -34,8 +34,11 @@ frontend/src/
 ├── layouts/      → estructura común (MainLayout con Navbar + Outlet)
 
 ## Roles del sistema (para cuando se implemente auth)
-- CLIENTE: ver catálogo, gestionar carrito, ver sus propios pedidos.
-- ADMINISTRADOR: gestión de productos, inventario, pedidos, ventas, dashboard.
+- CLIENTE: ver catálogo, gestionar carrito, comprar y ver sus propios pedidos.
+- VENDEDOR: gestionar pedidos, registrar ventas y método de pago; sin productos, inventario, reportes ni integraciones.
+- ADMINISTRADOR: productos, categorías, inventario, pedidos, ventas, usuarios/roles, dashboard e integraciones.
+- Roles combinables en usuarios.roles (arreglo PostgreSQL). El JWT lleva roles y Flask revalida los permisos vigentes.
+- RF-04: cada tamaño es una opción vendible con precio y stock propios.
 
 ## Contexto académico
 Este es un trabajo de titulación. El estudiante debe poder entender,
