@@ -13,6 +13,28 @@ código implementado con despliegue o servicio externo operativo.
 
 ## Resumen de avance
 
+**Avance del plan actual: 78 % (39 de 50 tareas marcadas).**
+
+Se cuentan únicamente las tareas de los cinco sprints y del buffer final;
+el resumen repite tareas y no se cuenta nuevamente. Cada tarea tiene el mismo
+peso: este porcentaje mide cumplimiento de la lista, no horas de trabajo ni
+porcentaje de funcionalidades validadas en producción. Se respetan las casillas
+actuales del documento, incluidas las verificaciones marcadas por el estudiante.
+El valor debe recalcularse cuando cambien las tareas o sus estados.
+
+| Etapa | Tareas marcadas / total | Avance |
+|---|---|---|
+| Sprint 1 | 5 / 5 | 100 % |
+| Sprint 2 | 8 / 8 | 100 % |
+| Sprint 3 | 9 / 11 | 82 % |
+| Sprint 4 | 8 / 9 | 89 % |
+| Sprint 5 | 6 / 9 | 67 % |
+| Buffer final | 3 / 8 | 38 % |
+| **Total** | **39 / 50** | **78 %** |
+
+Las tareas de aceptación pendientes siguen impidiendo el cierre de los sprints
+correspondientes, aunque su implementación esté disponible.
+
 | Área | Estado |
 |---|---|
 | Vistas base, rutas, catálogo y carrito | Implementadas |
@@ -180,6 +202,38 @@ ha solicitado ni modelado un inventario de ingredientes o recetas.
 **Instalación:** aplicar 001 y 002 en orden; 002 se ejecuta una vez. No volver a
 crear las tablas de una base existente. Si 001 ya fue aplicada, ejecutar solo 002.
 Las migraciones y las integraciones externas no se ejecutan automáticamente.
+
+## Objetivo futuro — Recuperación de acceso y gestión de credenciales
+
+Objetivo: permitir que un usuario recupere el acceso si olvida su contraseña,
+sin exponer contraseñas ni permitir cambios de roles. Se propone como mejora
+posterior al alcance actual de los cinco sprints; no se incluye en el 78 %.
+
+- [ ] Agregar “Olvidé mi contraseña” al login y un formulario de recuperación.
+- [ ] Configurar un servicio de correo para enviar un enlace de restablecimiento
+      al correo registrado, después de verificar su titularidad mediante el enlace.
+- [ ] Implementar tokens aleatorios de un solo uso, con vencimiento; almacenar
+      su hash y limitar los intentos de recuperación.
+- [ ] Permitir definir una contraseña nueva, guardar su hash e invalidar las
+      sesiones anteriores después del cambio.
+- [ ] Mostrar una respuesta genérica al solicitar recuperación, exista o no
+      la cuenta, para evitar revelar correos registrados.
+- [ ] Probar enlaces vencidos, usados, alterados y el inicio de sesión posterior.
+- [ ] Documentar la recuperación de acceso al correo y a las cuentas de los
+      proveedores, y la rotación de claves de Supabase, Telegram y del LLM.
+
+**Cómo recuperar el acceso:** la contraseña original no se puede consultar:
+la base guarda un hash. Actualmente no existe recuperación automática por
+correo; esta mejora permitirá crear una contraseña nueva mediante un enlace.
+Si se olvida también el correo de la cuenta, habrá que verificar la identidad
+antes de cambiarlo; ese procedimiento debe definirse como parte de la mejora.
+
+**Credenciales de servicios externos:** son distintas de la contraseña del
+usuario de la pizzería. Si una clave se pierde, se debe recuperar el acceso a
+la cuenta del proveedor y consultar o generar una clave nueva con sus mecanismos
+oficiales; después actualizar `backend/.env` y reiniciar Flask. Mantener una
+copia segura en un gestor de contraseñas, fuera de Git y de la documentación
+pública. No pegar claves reales en este archivo.
 
 ## Metodología
 
