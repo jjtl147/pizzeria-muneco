@@ -5,10 +5,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import json
 import os
 import re
+import uuid
+import time
 import httpx
 from types import SimpleNamespace
 from postgrest.exceptions import APIError
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask import jsonify
+import auth_supabase
 import app as backend
 
 
@@ -36,6 +40,12 @@ class Consulta:
         self.params.append(valores); self.filtros.append(f't.{identificador(campo)}=ANY(${len(self.params)}::integer[])'); return self
     def contains(self, campo, valores):
         self.params.append(valores); self.filtros.append(f't.{identificador(campo)} @> ${len(self.params)}::text[]'); return self
+    def ilike(self, campo, valor):
+        self.params.append(valor); self.filtros.append(f't.{identificador(campo)} ILIKE ${len(self.params)}'); return self
+    def gte(self, campo, valor):
+        self.params.append(valor); self.filtros.append(f't.{identificador(campo)} >= ${len(self.params)}'); return self
+    def lt(self, campo, valor):
+        self.params.append(valor); self.filtros.append(f't.{identificador(campo)} < ${len(self.params)}'); return self
     def order(self, campo, desc=False): self.orden=f' ORDER BY t.{identificador(campo)} '+('DESC' if desc else 'ASC'); return self
     def limit(self, n): self.limite=f' LIMIT {int(n)}'; return self
     def range(self, inicio, fin): self.limite=f' LIMIT {fin-inicio+1} OFFSET {inicio}'; return self
@@ -89,9 +99,74 @@ class DB:
         return RPC()
 
 
+# Auth simulado exclusivamente en este ejecutable de pruebas. Ninguna ruta de
+# producción tiene un bypass y no se envían correos ni peticiones externas.
+sesiones = {}
+refresh_revocados = set()
+recuperaciones = {}
+
+
+def nueva_sesion(user_id):
+    token = uuid.uuid4().hex
+    refresh = uuid.uuid4().hex
+    datos = {'access_token': token, 'refresh_token': refresh, 'expires_in': 3600,
+             'user': {'id': user_id}}
+    sesiones[token] = datos
+    return datos
+
+
+def auth_falso(method, path, datos=None, token=None):
+    ruta = path.split('?')[0]
+    if ruta == '/user':
+        if token not in sesiones: raise auth_supabase.AuthFailure(401)
+        identidad = sesiones[token]['user']
+        if method == 'PUT':
+            sql('UPDATE auth.users SET encrypted_password=$1 WHERE id=$2',
+                [generate_password_hash(datos['password']), identidad['id']])
+        return identidad
+    if ruta == '/token':
+        if 'grant_type=refresh_token' in path:
+            anterior = next((s for s in sesiones.values() if s['refresh_token'] == datos['refresh_token']), None)
+            if not anterior or datos['refresh_token'] in refresh_revocados:
+                raise auth_supabase.AuthFailure(400, 'invalid_credentials')
+            refresh_revocados.add(anterior['refresh_token'])
+            return nueva_sesion(anterior['user']['id'])
+        users = sql('SELECT id,encrypted_password FROM auth.users WHERE email=$1', [datos['email']])
+        if not users or not check_password_hash(users[0]['encrypted_password'], datos['password']):
+            raise auth_supabase.AuthFailure(400, 'invalid_credentials')
+        return nueva_sesion(users[0]['id'])
+    if ruta in ('/signup', '/admin/users'):
+        user_id = str(uuid.uuid4())
+        sql('INSERT INTO auth.users(id,email,encrypted_password,raw_app_meta_data,raw_user_meta_data) VALUES($1,$2,$3,$4::jsonb,$5::jsonb)',
+            [user_id, datos['email'], generate_password_hash(datos['password']),
+             json.dumps(datos.get('app_metadata', {})), json.dumps(datos.get('data', datos.get('user_metadata', {})))])
+        return nueva_sesion(user_id) if ruta == '/signup' else {'id': user_id}
+    if ruta == '/recover':
+        users = sql('SELECT id FROM auth.users WHERE email=$1', [datos['email']])
+        if users:
+            sesion = nueva_sesion(users[0]['id'])
+            recuperaciones[datos['email']] = '/restablecer#access_token=' + sesion['access_token'] + '&refresh_token=' + sesion['refresh_token'] + '&type=recovery&expires_in=3600'
+        return {}
+    if ruta == '/logout':
+        anterior = sesiones.get(token)
+        if anterior and 'scope=global' in path:
+            for sesion in sesiones.values():
+                if sesion['user'] == anterior['user']: refresh_revocados.add(sesion['refresh_token'])
+        elif anterior:
+            refresh_revocados.add(anterior['refresh_token'])
+        return {}
+    raise RuntimeError('Ruta de Auth no simulada')
+
+
+@backend.app.get('/__test/enlace/<email>')
+def enlace_prueba(email):
+    return jsonify({'url': recuperaciones[email]})
+
+
 if __name__=='__main__':
     backend.get_supabase_client=lambda: DB()
-    backend.JWT_SECRET_KEY='clave-exclusiva-para-las-pruebas-e2e-de-muneco'
+    backend.solicitar=auth_falso
+    auth_supabase.solicitar=auth_falso
     os.environ['TELEGRAM_ENABLED']='0'; os.environ['ASSISTANT_ENABLED']='0'
     password=generate_password_hash('Prueba123!')
     for email,roles in [('cliente@example.test',['CLIENTE']),('vendedor@example.test',['VENDEDOR']),('admin@example.test',['CLIENTE','ADMINISTRADOR'])]:

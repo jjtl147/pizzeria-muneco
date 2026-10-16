@@ -1,10 +1,8 @@
-import datetime
 import os
 import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import jwt
 from postgrest.exceptions import APIError
 import app as backend
 
@@ -14,10 +12,9 @@ class BackendTests(unittest.TestCase):
         integraciones = patch.dict(os.environ, {'TELEGRAM_ENABLED': '0', 'ASSISTANT_ENABLED': '0'})
         integraciones.start()
         self.addCleanup(integraciones.stop)
-        self.secret = 'clave-aleatoria-exclusiva-para-las-pruebas-locales'
-        self.key_patch = patch.object(backend, 'JWT_SECRET_KEY', self.secret)
-        self.key_patch.start()
-        self.addCleanup(self.key_patch.stop)
+        self.identity_patch = patch.object(backend, 'identidad_supabase', return_value='auth-uuid')
+        self.identity_patch.start()
+        self.addCleanup(self.identity_patch.stop)
         self.db = MagicMock()
         self.db_patch = patch.object(backend, 'get_supabase_client', return_value=self.db)
         self.db_patch.start()
@@ -28,14 +25,9 @@ class BackendTests(unittest.TestCase):
         self.addCleanup(self.usuario_patch.stop)
         self.client = backend.app.test_client()
 
-    def headers(self, rol='CLIENTE', **claims):
-        payload = {
-            'usuario_id': 1, 'roles': [rol] if isinstance(rol, str) else rol,
-            'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1),
-        }
-        self.usuario['roles'] = list(payload['roles'])
-        payload.update(claims)
-        return {'Authorization': 'Bearer ' + jwt.encode(payload, self.secret, algorithm='HS256')}
+    def headers(self, rol='CLIENTE'):
+        self.usuario['roles'] = [rol] if isinstance(rol, str) else rol
+        return {'Authorization': 'Bearer token-supabase-de-prueba'}
 
     def pedido(self, **campos):
         data = {'direccion_entrega': 'Calle 1', 'items': [{'producto_id': 2, 'cantidad': 1}]}
@@ -47,19 +39,6 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(self.client.get(ruta).status_code, 401)
         self.assertEqual(self.client.post('/api/productos', json={}, headers=self.headers()).status_code, 403)
         self.db.table.assert_not_called()
-
-    def test_token_expirado_y_claims_invalidos(self):
-        for claims in [{'exp': 1}, {'usuario_id': True}, {'usuario_id': '1'}, {'roles': ['OTRO']}]:
-            with self.subTest(claims=claims):
-                self.assertEqual(self.client.get('/api/auth/perfil', headers=self.headers(**claims)).status_code, 401)
-        token = jwt.encode({'usuario_id': 1, 'roles': ['CLIENTE']}, self.secret, algorithm='HS256')
-        self.assertEqual(self.client.get('/api/auth/perfil', headers={'Authorization': 'Bearer ' + token}).status_code, 401)
-
-    def test_secreto_obligatorio(self):
-        with patch.object(backend, 'JWT_SECRET_KEY', ''):
-            self.assertEqual(self.client.get('/api/auth/perfil', headers=self.headers()).status_code, 503)
-            with self.assertRaises(RuntimeError):
-                backend.clave_jwt()
 
     def test_json_y_textos_invalidos(self):
         for ruta in ['/api/auth/login', '/api/auth/registro', '/api/pedidos']:
@@ -129,18 +108,6 @@ class BackendTests(unittest.TestCase):
         respuesta = self.pedido()
         self.assertEqual(respuesta.status_code, 500)
         self.assertNotIn('credencial-interna', respuesta.get_data(as_text=True))
-
-    def test_registro_no_permite_escalar_roles(self):
-        self.db.table.return_value.select.return_value.eq.return_value.execute.return_value = SimpleNamespace(data=[])
-        self.db.table.return_value.insert.return_value.execute.return_value = SimpleNamespace(data=[{
-            'id': 1, 'nombre': 'Cliente', 'email': 'cliente@example.test', 'roles': ['CLIENTE']}])
-        respuesta = self.client.post('/api/auth/registro', json={
-            'nombre': 'Cliente', 'email': 'cliente@example.test', 'password': 'Prueba123!',
-            'roles': ['ADMINISTRADOR'], 'rol': 'ADMINISTRADOR'})
-        self.assertEqual(respuesta.status_code, 201)
-        self.assertEqual(respuesta.json['data']['roles'], ['CLIENTE'])
-        self.assertNotIn('password_hash', respuesta.json['data'])
-        self.assertEqual(self.db.table.return_value.insert.call_args.args[0]['roles'], ['CLIENTE'])
 
     def test_password_no_se_recorta(self):
         with backend.app.test_request_context(json={'password': '  secreto  '}):

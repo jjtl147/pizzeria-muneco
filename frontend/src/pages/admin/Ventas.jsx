@@ -7,7 +7,10 @@ import Paginacion from '../../components/Paginacion'
 import { dinero, fecha, nombreProducto } from '../../utils/formato'
 export default function Ventas() {
   const [pagina, setPagina] = useState(1)
-  const consulta = useConsulta(`/api/ventas?pagina=${pagina}`)
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
+  const [rango, setRango] = useState(null)
+  const consulta = useConsulta(rango ? `/api/ventas?${new URLSearchParams({ ...rango, pagina })}` : null)
   const catalogo = useConsulta('/api/productos')
   const [productoId, setProductoId] = useState('')
   const [cantidad, setCantidad] = useState(1)
@@ -16,6 +19,11 @@ export default function Ventas() {
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  function consultar(e) {
+    e.preventDefault()
+    if (rango?.desde === desde && rango?.hasta === hasta && pagina === 1) consulta.recargar()
+    setRango({ desde, hasta }); setPagina(1)
+  }
   function agregar(e) {
     e.preventDefault()
     const producto = catalogo.data.find((p) => p.id === Number(productoId))
@@ -43,9 +51,21 @@ export default function Ventas() {
       </tbody></Table><p>Total estimado: <strong>{dinero(items.reduce((t, p) => t + p.precio * p.cantidad, 0))}</strong></p>
       <Form.Group controlId="venta-pago" className="mb-3"><Form.Label>Pago recibido</Form.Label><Form.Select value={pago} disabled={ocupado} onChange={(e) => setPago(e.target.value)}>{['EFECTIVO', 'QR', 'TARJETA'].map((m) => <option key={m}>{m}</option>)}</Form.Select></Form.Group>
       <Button disabled={ocupado || !items.length} onClick={vender}>{ocupado ? 'Registrando...' : 'Confirmar venta'}</Button>
-    </Card.Body></Card><h3 className="h5">Ventas registradas</h3><EstadoConsulta {...consulta} />
-    <Table responsive striped><thead><tr><th>Venta</th><th>Pedido</th><th>Fecha</th><th>Vendedor</th><th>Pago</th><th>Total</th></tr></thead><tbody>
+    </Card.Body></Card><h3 className="h5">Ventas registradas</h3>
+    <Form onSubmit={consultar} className="d-flex gap-3 flex-wrap align-items-end mb-3">
+      <Form.Group controlId="ventas-desde"><Form.Label>Desde</Form.Label>
+        <Form.Control type="date" required value={desde} onChange={(e) => setDesde(e.target.value)} /></Form.Group>
+      <Form.Group controlId="ventas-hasta"><Form.Label>Hasta</Form.Label>
+        <Form.Control type="date" required min={desde || undefined} value={hasta} onChange={(e) => setHasta(e.target.value)} /></Form.Group>
+      <Button type="submit" disabled={consulta.cargando}>Consultar ventas</Button>
+      <Button variant="outline-secondary" onClick={() => { setDesde(''); setHasta(''); setRango(null); setPagina(1) }}>Limpiar fechas</Button>
+    </Form>
+    {!rango && <Alert variant="info">Selecciona Desde y Hasta y pulsa Consultar ventas para ver el historial.</Alert>}
+    <EstadoConsulta {...consulta} />
+    {rango && !consulta.cargando && !consulta.error && <><Table responsive striped><thead><tr><th>Venta</th><th>Pedido</th><th>Fecha</th><th>Vendedor</th><th>Pago</th><th>Total</th></tr></thead><tbody>
       {consulta.data.map((v) => <tr key={v.id}><td>#{v.id}</td><td>#{v.pedido_id}</td><td>{fecha(v.fecha_venta)}</td><td>{v.usuarios?.nombre || '—'}</td><td>{v.metodo_pago}</td><td>{dinero(v.total)}</td></tr>)}
-    </tbody></Table><Paginacion pagina={pagina} cambiar={setPagina} {...consulta} />
+    </tbody></Table>
+    {!consulta.data.length && <p>No hay ventas en el periodo seleccionado.</p>}
+    <Paginacion pagina={pagina} cambiar={setPagina} {...consulta} /></>}
   </>
 }

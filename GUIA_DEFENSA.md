@@ -13,6 +13,8 @@ sobre datos operativos cuando se configure el proveedor externo.
 ```mermaid
 flowchart LR
     Cliente[React y Bootstrap] -->|Axios: JSON y JWT| Flask[Flask: validación y autorización]
+    Flask -->|Credenciales y verificación de sesión| Auth[Supabase Auth]
+    Flask -->|Fotos del catálogo| Storage[Supabase Storage]
     Flask -->|Supabase: tablas y RPC| PostgreSQL[PostgreSQL: datos y transacciones]
     Flask -->|Notificaciones opcionales| Telegram[Telegram]
     Flask -->|Herramientas de lectura| LLM[LLM opcional]
@@ -31,8 +33,13 @@ basta tener alguno de los roles autorizados. Cada solicitud protegida consulta
 los roles vigentes en PostgreSQL, evitando que un token antiguo mantenga un
 permiso retirado. Las rutas de React ocultan pantallas; Flask garantiza el acceso.
 
-Las contraseñas se guardan como hashes, no como texto. El token JWT se firma
-con una clave del entorno y expira. El registro público no puede elegir roles.
+Supabase Auth gestiona contraseñas, confirmaciones y recuperación por correo,
+y emite access/refresh tokens. Flask verifica la identidad en Auth y la vincula
+por `usuarios.auth_user_id`; no firma JWT propios. Los hashes heredados se
+eliminan al migrar cada cuenta, conservando IDs e historial. El registro público
+no puede elegir roles. Storage almacena las fotos del catálogo; las cargas se
+autorizan en Flask y admiten JPEG/PNG/WebP hasta 5 MB. La activación real requiere
+las migraciones 003/004 y la configuración de Auth descrita en SUPABASE_ACTIVACION.md.
 Las tablas tienen RLS y acceso reservado al backend; las claves secretas no
 están en el navegador. El último administrador no puede perder ese rol.
 
@@ -96,7 +103,8 @@ Bot, chat y credenciales todavía deben configurarse y probarse.
 - Pruebas SQL: migración de usuarios, atomicidad, stock por tamaño, estados,
   devolución de stock, cobros duplicados y reportes, en PostgreSQL PGlite aislado.
 - Prueba de navegador: React, Axios, Flask real y PostgreSQL mediante adaptador local.
-  Incluye cliente, vendedor y administrador. No se conecta al Supabase del estudiante.
+  Incluye cliente, vendedor, administrador y recuperación/renovación con Auth
+  simulado. No se conecta al Supabase del estudiante.
 - Build y ESLint comprueban compilación y reglas de JavaScript; no prueban el negocio.
 
 Para el cierre académico se necesitan también pruebas en Supabase, concurrencia

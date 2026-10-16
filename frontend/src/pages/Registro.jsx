@@ -14,8 +14,8 @@ export default function Registro() {
     if (form.password !== confirmacion) { setError('Las contraseñas no coinciden.'); return }
     setEnviando(true)
     try {
-      await api.post('/api/auth/registro', form)
-      navigate('/login', { replace: true, state: { mensaje: 'Cuenta creada. Inicia sesión para comprar.' } })
+      const { data } = await api.post('/api/auth/registro', form)
+      navigate('/login', { replace: true, state: { mensaje: data.mensaje } })
     } catch (err) { setError(mensajeError(err)) } finally { setEnviando(false) }
   }
   return <Card className="mx-auto my-4" style={{ maxWidth: 560 }}><Card.Body>
@@ -24,7 +24,7 @@ export default function Registro() {
       {Object.entries({ nombre: 'Nombre', email: 'Correo electrónico', password: 'Contraseña', telefono: 'Teléfono', direccion: 'Dirección' }).map(([campo, etiqueta]) =>
         <Form.Group key={campo} className="mb-3" controlId={`registro-${campo}`}><Form.Label>{etiqueta}</Form.Label>
           <Form.Control value={form[campo]} type={campo === 'password' ? 'password' : campo === 'email' ? 'email' : campo === 'telefono' ? 'tel' : 'text'}
-            required={['nombre', 'email', 'password'].includes(campo)} minLength={campo === 'password' ? 6 : undefined}
+            required={['nombre', 'email', 'password'].includes(campo)} minLength={campo === 'password' ? 8 : undefined}
             maxLength={campo === 'nombre' ? 100 : campo === 'email' ? 150 : campo === 'telefono' ? 20 : undefined}
             autoComplete={campo === 'password' ? 'new-password' : undefined}
             onChange={(e) => setForm({ ...form, [campo]: e.target.value })} /></Form.Group>)}

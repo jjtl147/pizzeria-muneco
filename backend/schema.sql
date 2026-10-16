@@ -2,7 +2,7 @@
 -- Esquema de Base de Datos - Sistema Web Pizzería Muñeco
 -- Motor: PostgreSQL (Supabase)
 -- Proyecto de Titulación - Ingeniería de Sistemas
--- Base inicial: aplicar después las migraciones 001 y 002, en ese orden.
+-- Base histórica: aplicar después 001 a 005, en orden. 005 retira el rol antiguo.
 -- ==========================================================
 
 -- 1. TABLA: categorias

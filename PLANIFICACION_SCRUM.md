@@ -2,7 +2,7 @@
 
 Proyecto de titulación — Ingeniería de Sistemas.
 Inicio: 4 de septiembre de 2026. Entrega objetivo: 10 de noviembre de 2026.
-Estado revisado: 9 de octubre de 2026.
+Estado revisado: 15 de octubre de 2026.
 
 ## Criterio de avance
 
@@ -13,7 +13,7 @@ código implementado con despliegue o servicio externo operativo.
 
 ## Resumen de avance
 
-**Avance del plan actual: 78 % (39 de 50 tareas marcadas).**
+**Avance del plan original: 84 % (42 de 50 tareas marcadas; quedan 8).**
 
 Se cuentan únicamente las tareas de los cinco sprints y del buffer final;
 el resumen repite tareas y no se cuenta nuevamente. Cada tarea tiene el mismo
@@ -26,32 +26,94 @@ El valor debe recalcularse cuando cambien las tareas o sus estados.
 |---|---|---|
 | Sprint 1 | 5 / 5 | 100 % |
 | Sprint 2 | 8 / 8 | 100 % |
-| Sprint 3 | 9 / 11 | 82 % |
-| Sprint 4 | 8 / 9 | 89 % |
+| Sprint 3 | 10 / 11 | 91 % |
+| Sprint 4 | 9 / 9 | 100 % |
 | Sprint 5 | 6 / 9 | 67 % |
-| Buffer final | 3 / 8 | 38 % |
-| **Total** | **39 / 50** | **78 %** |
+| Buffer final | 4 / 8 | 50 % |
+| **Total** | **42 / 50** | **84 %** |
 
-Las tareas de aceptación pendientes siguen impidiendo el cierre de los sprints
-correspondientes, aunque su implementación esté disponible.
+El estudiante acepta el flujo de compra y operación al cierre del 15 de octubre.
+Sprint 4 completado. Sprint 3 conserva pendiente la conciliación del pedido #1;
+Sprint 5 y el buffer conservan las verificaciones externas y académicas pendientes.
 
 | Área | Estado |
 |---|---|
 | Vistas base, rutas, catálogo y carrito | Implementadas |
 | API Flask, Supabase y esquema inicial | Implementados |
-| Login, registro, sesión y pedidos del cliente con Axios | Implementados; validar con Supabase |
-| Roles combinables y tamaños con precio/stock propios | Migración y código preparados |
-| Panel del vendedor: pedidos, ventas y tipo de pago | Implementado; validar con Supabase |
-| Panel del administrador: productos, categorías, inventario, usuarios y roles | Implementado; validar con Supabase |
-| Reportes de ventas, estadísticas y consumo de productos | Implementados; validar con Supabase |
+| Login, sesión y pedidos del cliente con Axios | Flujo operativo aceptado por el estudiante; confirmación/recuperación por correo pendientes |
+| Roles combinables y tamaños con precio/stock propios | Implementados; aceptación del flujo informada por el estudiante |
+| Panel del vendedor: pedidos, ventas y tipo de pago | Implementado; operación aceptada por el estudiante |
+| Panel del administrador: productos, categorías, inventario, usuarios y roles | Implementado; aceptación operativa informada por el estudiante |
+| Reportes de ventas, estadísticas y consumo de productos | Implementados; comprobación incluida en el flujo aceptado |
 | Telegram y asistente LLM con herramientas de lectura | Código preparado; faltan credenciales y pruebas con servicios reales |
 
 La conexión por Axios incluye ahora catálogo, autenticación, pedidos y paneles.
-Verificación local: 27 pruebas Python, scripts SQL y recorrido completo de navegador
-aprobados; ESLint y compilación correctos.
+Verificación local actual: 41 pruebas Python, tres recorridos de navegador
+y migraciones 001–005 aprobadas; ESLint y compilación correctos. Login administrativo real en Auth comprobado y
+bucket de Storage configurado. La recuperación por correo, las fotos reales y
+las comprobaciones específicas de servicios externos siguen pendientes. La
+aceptación del flujo operativo fue informada por el estudiante al finalizar el día.
 
 Las pruebas locales no sustituyen la comprobación de las políticas, las claves
 ni el esquema del proyecto Supabase del estudiante.
+
+### Evidencias iniciales del 15 de octubre de 2026
+
+Los conteos y pendientes siguientes corresponden al diagnóstico inicial; el
+cierre de la jornada y la aceptación posterior se registran después.
+
+- Verificación local repetida: 27 pruebas Python aprobadas; ESLint y compilación
+  del frontend correctos.
+- Consulta de solo lectura en Supabase: 5 productos, 5 registros de inventario,
+  3 usuarios, 2 pedidos y ninguna venta. Las consultas de productos, usuarios y
+  pedidos reconocen las columnas de tamaños, roles y `stock_descontado`.
+- Hay 1 cuenta con ADMINISTRADOR, 2 con CLIENTE y ninguna con VENDEDOR.
+  Falta preparar una cuenta de vendedor para la aceptación de ese rol.
+- El pedido **#1** está en un estado no terminal y tiene `stock_descontado=NULL`.
+  Debe conciliarse con evidencias antes de cancelar; no se modificó su stock.
+- El estudiante no dispone de evidencia del descuento del pedido #1 y decide
+  mantenerlo pendiente. La aceptación se realizará con sus cuentas desde el
+  navegador, sin crear cuentas ni productos exclusivos de prueba.
+- Primera compra comunicada por el estudiante: pedido **#3**, consultado en
+  Supabase en estado PENDIENTE, con 2 unidades de Pizza Test a 35 (total 70),
+  `stock_descontado=TRUE` y stock actual del producto de 48. Sin tamaño asignado
+  ni venta registrada todavía. Falta contrastar el stock previo, comprobar una
+  opción con tamaño y completar estados, cobro y aceptación por rol.
+- Telegram y asistente siguen desactivados y sin credenciales configuradas.
+- Próximo paso: aceptar login, compra, historial, stock, estados y cobro usando
+  datos de prueba identificados; después comprobar permisos de los tres roles.
+
+Las consultas iniciales por sí solas no aceptaban la compra. Al cierre de la
+jornada, el estudiante confirmó que las pruebas indicadas del flujo de trabajo
+funcionan correctamente. Se registra su aceptación funcional en Supabase, con
+las limitaciones y pendientes del cierre siguiente. El diagnóstico de lectura
+puede repetirse con `backend/verificar_supabase.py`.
+
+### Cierre de jornada — 15 de octubre de 2026
+
+- Aceptación informada por el estudiante del flujo propuesto: compra e historial,
+  descuento de stock, estados del pedido, cobro, reportes y cancelación de un
+  pedido nuevo, con devolución única de stock y restricción de cobro duplicado.
+- Se marcan tres tareas del plan original: aceptación de compra (Sprint 3),
+  validación operativa por roles (Sprint 4) y aceptación operativa de extremo a
+  extremo (buffer). La fuente de aceptación es la confirmación del estudiante;
+  no se adjuntaron capturas ni nuevas trazas de sus pruebas manuales.
+- Búsqueda de usuarios por correo y consulta de ventas/reportes solo con fechas
+  implementadas. Restricciones del vendedor comprobadas en pruebas automatizadas.
+- Comprobaciones locales de esta jornada: 41 pruebas Python, tres recorridos de
+  navegador, SQL hasta 005, ESLint y compilación aprobados. Auth/Storage externos
+  se distinguen de los servicios simulados en las pruebas locales.
+- Avance original: **42/50 (84 %)**. La ampliación Auth/Storage conserva **6/9**;
+  el flujo operativo aceptado no demuestra por sí solo entrega de correo,
+  recuperación, importación de todas las cuentas ni fotos reales.
+- Flask y Vite iniciados por el asistente fueron detenidos. Los procesos de las
+  pruebas aisladas finalizaron con sus runners. El estudiante realizará el commit.
+
+**Retomar el 16 de octubre:** confirmar el resultado de 005 en Supabase; revisar
+URLs de retorno/SMTP y probar confirmación y recuperación con correo real;
+comprobar una foto en Storage; continuar con Telegram/asistente, concurrencia y
+documentación. Mantener el pedido #1 bloqueado para cancelar hasta conciliar su
+inventario con evidencia. No repetir migraciones ya aplicadas.
 
 ### Qué está hecho y qué falta comprobar
 
@@ -60,7 +122,7 @@ ni el esquema del proyecto Supabase del estudiante.
 - [x] Interfaz y backend del asistente virtual para el administrador.
 - [ ] Configurar el proveedor/modelo y probar respuestas reales del asistente.
 - [ ] Configurar Telegram y comprobar las notificaciones reales.
-- [ ] Validar los paneles y el flujo de compra con el Supabase del proyecto.
+- [x] Validar los paneles y el flujo de compra con el Supabase del proyecto (aceptación informada por el estudiante).
 
 El panel de administración se abre con una cuenta ADMINISTRADOR desde
 `/operacion`; sus pestañas incluyen productos, categorías, inventario y usuarios.
@@ -72,13 +134,14 @@ pendientes corresponden a configuración externa y aceptación en el entorno rea
 
 Se utiliza `usuarios.roles`, un arreglo PostgreSQL con uno o varios valores de
 CLIENTE, VENDEDOR y ADMINISTRADOR. La migración copia el rol de cada usuario
-existente. La columna antigua `rol` se conserva como dato heredado; el código
-nuevo no la utiliza para autorizar.
+existente. La migración 005 está preparada para retirar la columna antigua `rol`;
+el código actual no la utiliza para autorizar. Su ejecución real sigue pendiente.
 
-El JWT incluye una lista de roles. Flask consulta el usuario vigente en cada
-solicitud protegida: quitar un rol tiene efecto aunque el JWT no haya expirado.
-`rol_requerido(...)` permite el acceso cuando coincide al menos un rol.
-Los tokens anteriores con `rol` único requieren iniciar sesión nuevamente.
+Supabase Auth emite el JWT de identidad. Flask lo valida con Auth y consulta
+`usuarios.roles` mediante `auth_user_id` en cada solicitud protegida: quitar un
+rol tiene efecto aunque el token no haya expirado. `rol_requerido(...)` permite
+acceso cuando coincide al menos un rol. Los JWT propios anteriores requieren
+iniciar sesión nuevamente. Esta adaptación requiere aplicar 003 antes del reinicio.
 
 | Permiso | CLIENTE | VENDEDOR | ADMINISTRADOR |
 |---|---|---|---|
@@ -137,7 +200,7 @@ Las correcciones de base cubren la transición después del Sprint 2.
 - [x] RF-04: selección de tamaño, precio y stock independientes.
 - [x] Confirmar ejecución correcta de migración 002 en Supabase.
 - [x] Comprobar login de usuarios existentes con los nuevos roles.
-- [ ] Aceptar flujo completo de compra en el entorno real.
+- [x] Aceptar flujo completo de compra en el entorno real (confirmado por el estudiante al cierre del 15 de octubre).
 - [ ] Conciliar si los pedidos anteriores descontaron stock antes de permitir su cancelación.
 
 ## Sprint 4 — 14 al 26 de octubre
@@ -152,7 +215,7 @@ Objetivo: gestión operativa del administrador y vendedor.
 - [x] Panel del vendedor: pedidos, venta en local, registro de cobro y método de pago.
 - [x] Gestión de usuarios y asignación/quita de roles.
 - [x] Impedir quitar el último administrador y registrar cobros duplicados.
-- [ ] Validar la operación en Supabase con cuentas de cada rol.
+- [x] Validar la operación en Supabase con cuentas de cada rol (aceptación del flujo informada por el estudiante).
 
 ## Sprint 5 — 26 de octubre al 7 de noviembre
 
@@ -160,7 +223,7 @@ Objetivo: reportes e integraciones.
 
 - [x] Dashboard de ventas cobradas, cantidad y promedio.
 - [x] Reportes por fecha, pago, producto y tamaño; descarga CSV.
-- [x] Consumo de productos del periodo (últimos siete días por defecto).
+- [x] Consumo de productos del periodo seleccionado; siete días en las herramientas del asistente.
 - [x] Código de notificaciones Telegram: pedido nuevo y stock bajo.
 - [x] Código del asistente con LLM y function calling sobre datos reales.
 - [x] Asistente limitado a herramientas de lectura y rol ADMINISTRADOR.
@@ -177,7 +240,7 @@ La ampliación de roles y el ajuste de fechas dejan tres días de estabilizació
 - [x] Pruebas SQL aisladas de transacciones, tamaños, estados y ventas.
 - [x] Flujo de navegador React → Axios → Flask → PostgreSQL aislado: cliente,
       vendedor, administrador, catálogo, compra, cobros, CRUD, inventario y roles.
-- [ ] Completar aceptación de flujos de extremo a extremo en Supabase.
+- [x] Completar aceptación de flujos operativos de extremo a extremo en Supabase (confirmación del estudiante; integraciones externas se validan aparte).
 - [ ] Probar compras simultáneas con conexiones PostgreSQL independientes.
 - [ ] Verificar notificaciones y asistente con servicios reales.
 - [ ] Revisar documentación académica, diagramas UML y casos de uso.
@@ -199,34 +262,72 @@ su cobro. Una venta en local crea pedido, detalles, descuento y cobro juntos.
 **Consumo semanal:** mide unidades de productos de pedidos no cancelados. No se
 ha solicitado ni modelado un inventario de ingredientes o recetas.
 
-**Instalación:** aplicar 001 y 002 en orden; 002 se ejecuta una vez. No volver a
-crear las tablas de una base existente. Si 001 ya fue aplicada, ejecutar solo 002.
-Las migraciones y las integraciones externas no se ejecutan automáticamente.
+**Instalación:** aplicar las migraciones 001 a 005 en orden, sin repetir las ya
+aplicadas. No volver a crear las tablas de una base existente. Para la ampliación
+Auth/Storage, seguir `SUPABASE_ACTIVACION.md`. Las migraciones y la configuración
+del panel no se ejecutan automáticamente.
 
-## Objetivo futuro — Recuperación de acceso y gestión de credenciales
+## Ampliación solicitada — Supabase Auth y Storage
 
-Objetivo: permitir que un usuario recupere el acceso si olvida su contraseña,
-sin exponer contraseñas ni permitir cambios de roles. Se propone como mejora
-posterior al alcance actual de los cinco sprints; no se incluye en el 78 %.
+Solicitada el 15 de octubre. Se conserva el indicador del plan original de
+**42/50 (84 %)**; esta ampliación se informa aparte y requiere reestimar el trabajo
+restante después de la activación real. Código preparado no equivale a servicio
+activado.
 
-- [ ] Agregar “Olvidé mi contraseña” al login y un formulario de recuperación.
-- [ ] Configurar un servicio de correo para enviar un enlace de restablecimiento
-      al correo registrado, después de verificar su titularidad mediante el enlace.
-- [ ] Implementar tokens aleatorios de un solo uso, con vencimiento; almacenar
-      su hash y limitar los intentos de recuperación.
-- [ ] Permitir definir una contraseña nueva, guardar su hash e invalidar las
-      sesiones anteriores después del cambio.
-- [ ] Mostrar una respuesta genérica al solicitar recuperación, exista o no
-      la cuenta, para evitar revelar correos registrados.
-- [ ] Probar enlaces vencidos, usados, alterados y el inicio de sesión posterior.
-- [ ] Documentar la recuperación de acceso al correo y a las cuentas de los
-      proveedores, y la rotación de claves de Supabase, Telegram y del LLM.
+- [x] Delegar registro, login, validación, renovación y cierre de sesión a Auth.
+- [x] Preparar migración 003 para vincular identidades sin cambiar IDs ni roles;
+      importar cuentas heredadas tras probar su contraseña y eliminar su hash.
+- [x] Implementar recuperación y nueva contraseña con respuestas genéricas;
+      probar renovación, enlace inválido y cambio con Auth simulado.
+- [x] Preparar bucket y subida de fotos de productos con Supabase Storage,
+      autorización ADMINISTRADOR y límite de formato/tamaño.
+- [x] Documentar activación, configuración SMTP, redirecciones y límites de sesiones.
+- [x] Aplicar 003 y 004 en Supabase y reiniciar Flask con el nuevo código.
+      Ejecución informada por el estudiante y verificación remota de
+      `usuarios.auth_user_id` y bucket `productos`: público, 5 MB, JPEG/PNG/WebP.
+- [ ] Configurar Auth, URLs de retorno y correo SMTP en el panel.
+- [ ] Validar migración del administrador, confirmación, recuperación, cierre y
+      renovación con Auth real; comprobar enlaces vencidos/usados del proveedor.
+- [ ] Validar subida y visualización de fotos con Storage real y los permisos.
 
-**Cómo recuperar el acceso:** la contraseña original no se puede consultar:
-la base guarda un hash. Actualmente no existe recuperación automática por
-correo; esta mejora permitirá crear una contraseña nueva mediante un enlace.
-Si se olvida también el correo de la cuenta, habrá que verificar la identidad
-antes de cambiarlo; ese procedimiento debe definirse como parte de la mejora.
+Comprobación tras activar las migraciones: Auth por correo habilitado, registro
+permitido y confirmación de correo requerida. Flask reiniciado y
+`FRONTEND_URL=http://127.0.0.1:5173` configurado. Hay 4 perfiles sin vincular a
+Auth antes de su primer login. Las URLs del panel, SMTP y los flujos reales
+siguen pendientes de comprobación; no se han enviado correos de prueba.
+
+Diagnóstico posterior del acceso: la cuenta administradora solicitada ya no
+aparecía en `usuarios` ni en Auth. Se volvió a crear directamente en Auth con
+el perfil generado por el trigger y se asignó ADMINISTRADOR. Se verificaron
+login real en Auth, consulta del perfil y acceso a usuarios con respuesta 200.
+Esta comprobación del login no demuestra la importación de las otras cuentas
+heredadas ni el envío de correos. El flujo de compra/operación fue aceptado
+posteriormente por el estudiante al cierre de la jornada.
+
+Limpieza solicitada: 005 elimina únicamente `usuarios.rol`. Las ocho tablas
+operativas tienen uso; `password_hash` se mantiene para las cuentas todavía sin
+migrar y `stock_descontado` para cancelar sin duplicar inventario. Pruebas SQL
+aprobadas con comparación de datos antes/después y validación de roles/Auth
+sin el campo antiguo. Aplicación de 005 en Supabase pendiente de confirmación.
+
+Filtros solicitados: búsqueda de usuarios por correo parcial/completo en el
+servidor; historial de ventas y reportes requieren Desde/Hasta y consulta
+explícita, sin carga inicial de datos. Las ventas mantienen 50 registros por
+página y el vendedor solo consulta las registradas por su cuenta. Los permisos
+administrativos siguen protegidos en Flask. No se requiere migración SQL nueva.
+
+Las contraseñas se gestionan en Auth una vez migradas. Para recuperar una cuenta
+heredada, primero debe haberse vinculado al iniciar sesión con su contraseña
+anterior; si ya se olvidó, se requiere verificar identidad y migración asistida.
+La importación mantiene la confianza del sistema anterior, que no verificaba el
+correo; no prueba titularidad del correo heredado. Los registros nuevos deben
+confirmarlo. Supabase puede mantener access tokens válidos hasta su vencimiento,
+aunque se revoquen los refresh tokens al cerrar sesión/cambiar contraseña.
+
+Ya utilizamos PostgreSQL, funciones RPC y RLS. Realtime queda para evaluación
+posterior; requiere políticas propias de suscripción. Telegram y LLM siguen
+requiriendo sus proveedores. No se ha cambiado el alcance a inventario de
+ingredientes ni a cobros bancarios.
 
 **Credenciales de servicios externos:** son distintas de la contraseña del
 usuario de la pizzería. Si una clave se pierde, se debe recuperar el acceso a

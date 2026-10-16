@@ -2,8 +2,17 @@ const { createRequire } = require('node:module')
 const herramientas = createRequire(process.env.TEST_TOOLS_PATH + '/package.json')
 const { test, expect } = herramientas('@playwright/test')
 
+function fechaBolivia() {
+  const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/La_Paz',
+    year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
+  const obtener = (tipo) => partes.find((p) => p.type === tipo).value
+  return `${obtener('year')}-${obtener('month')}-${obtener('day')}`
+}
+
 test('cliente, vendedor y administrador: compra, cobro, venta, stock y roles', async ({ page }) => {
   const errores = []
+  const consultas = []
+  page.on('request', (r) => { if (r.method() === 'GET') consultas.push(new URL(r.url()).pathname) })
   page.on('pageerror', (e) => errores.push(e.message))
   await page.route('https://placehold.co/**', (route) => route.abort())
   async function login(email) {
@@ -22,7 +31,7 @@ test('cliente, vendedor y administrador: compra, cobro, venta, stock y roles', a
   await page.getByLabel('Contraseña', { exact: true }).fill('Prueba123!')
   await page.getByLabel('Repetir contraseña').fill('Prueba123!')
   await page.getByRole('button', { name: 'Registrarme' }).click()
-  await expect(page.getByText('Cuenta creada. Inicia sesión para comprar.')).toBeVisible()
+  await expect(page.getByText('Solicitud recibida. Si corresponde, recibirá un correo de confirmación. Luego podrá iniciar sesión.')).toBeVisible()
   await login('nuevo@example.test')
   await page.goto('/catalogo')
   await page.getByLabel('Tamaño').selectOption({ label: 'Familiar — $20.00' })
@@ -49,6 +58,8 @@ test('cliente, vendedor y administrador: compra, cobro, venta, stock y roles', a
   await page.goto('/operacion/productos')
   await expect(page.getByText('No tienes permisos para acceder a esta sección.')).toBeVisible()
   await page.goto('/operacion/ventas')
+  await expect(page.getByText('Selecciona Desde y Hasta y pulsa Consultar ventas para ver el historial.')).toBeVisible()
+  expect(consultas.filter((ruta) => ruta === '/api/ventas')).toHaveLength(0)
   await page.getByLabel('Producto y tamaño').selectOption({ label: 'Pizza prueba (Mediana) — $12.00' })
   await page.getByLabel('Cantidad', { exact: true }).fill('2')
   await page.getByRole('button', { name: 'Agregar producto' }).click()
@@ -57,7 +68,14 @@ test('cliente, vendedor y administrador: compra, cobro, venta, stock y roles', a
   await expect(page.getByText('Venta registrada para el pedido #2.')).toBeVisible()
   await salir(); await login('admin@example.test')
   await page.getByRole('link', { name: 'Reportes', exact: true }).click()
+  await expect(page.getByText('Selecciona Desde y Hasta y pulsa Consultar para ver el reporte.')).toBeVisible()
+  expect(consultas.filter((ruta) => ruta === '/api/reportes/ventas')).toHaveLength(0)
+  await page.getByLabel('Desde', { exact: true }).fill(fechaBolivia())
+  await page.getByLabel('Hasta', { exact: true }).fill(fechaBolivia())
+  await page.getByRole('button', { name: 'Consultar', exact: true }).click()
   await expect(page.getByText('$44.00', { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Limpiar fechas' }).click()
+  await expect(page.getByText('$44.00', { exact: true })).toHaveCount(0)
   await page.getByRole('link', { name: 'Inventario', exact: true }).click()
   await expect(page.getByRole('row').filter({ hasText: 'Pizza prueba (Mediana)' })).toContainText('8')
   await page.getByRole('link', { name: 'Categorías', exact: true }).click()
@@ -93,6 +111,9 @@ test('cliente, vendedor y administrador: compra, cobro, venta, stock y roles', a
   await page.getByRole('button', { name: 'Guardar stock' }).click()
   await expect(inventario).toContainText('7')
   await page.getByRole('link', { name: 'Usuarios y roles' }).click()
+  await page.getByLabel('Buscar por correo').fill('VENDEDOR@example.test')
+  await page.getByRole('button', { name: 'Filtrar usuarios' }).click()
+  await expect(page.locator('tbody tr')).toHaveCount(1)
   const vendedor = page.getByRole('row').filter({ hasText: 'vendedor@example.test' })
   await vendedor.getByRole('button', { name: 'Editar roles' }).click()
   await page.getByLabel('CLIENTE', { exact: true }).check()
@@ -113,4 +134,105 @@ test('cliente, vendedor y administrador: compra, cobro, venta, stock y roles', a
   await salir(); await login('vendedor@example.test')
   await expect(page.getByRole('link', { name: 'Mis pedidos' })).toBeVisible()
   expect(errores).toEqual([])
+})
+
+test('recuperar acceso, rechazar enlace inválido y usar la contraseña nueva', async ({ page }) => {
+  const api = 'http://127.0.0.1:5059'
+  const email = 'recuperacion@example.test'
+  const registro = await page.request.post(`${api}/api/auth/registro`, { data: {
+    nombre: 'Recuperación', email, password: 'Anterior123!',
+  } })
+  expect(registro.status()).toBe(202)
+  await page.goto('/restablecer#access_token=invalido&refresh_token=invalido&type=recovery')
+  await expect(page.getByText('El enlace venció o no es válido. Solicita uno nuevo.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Guardar contraseña' })).toHaveCount(0)
+  await page.goto('/login')
+  await page.getByRole('link', { name: 'Olvidé mi contraseña' }).click()
+  await page.getByLabel('Correo electrónico').fill(email)
+  await page.getByRole('button', { name: 'Enviar enlace' }).click()
+  await expect(page.getByText('Si la cuenta permite recuperar el acceso, recibirá un enlace en su correo.')).toBeVisible()
+  const enlace = await (await page.request.get(`${api}/__test/enlace/${email}`)).json()
+  await page.goto(enlace.url)
+  await expect(page.getByRole('button', { name: 'Guardar contraseña' })).toBeVisible()
+  await expect(page).toHaveURL(/\/restablecer$/)
+  await page.getByLabel('Nueva contraseña', { exact: true }).fill('Nueva123!')
+  await page.getByLabel('Repetir contraseña').fill('Nueva123!')
+  await page.getByRole('button', { name: 'Guardar contraseña' }).click()
+  await expect(page.getByText('Contraseña actualizada. Inicia sesión con la nueva contraseña.')).toBeVisible()
+  const anterior = await page.request.post(`${api}/api/auth/login`, { data: { email, password: 'Anterior123!' } })
+  expect(anterior.status()).toBe(401)
+  await page.getByLabel('Correo electrónico').fill(email)
+  await page.getByLabel('Contraseña', { exact: true }).fill('Nueva123!')
+  await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible()
+  const sesion = await page.evaluate(() => JSON.parse(sessionStorage.getItem('muneco_sesion')))
+  await page.evaluate(() => {
+    const s = JSON.parse(sessionStorage.getItem('muneco_sesion'))
+    s.expires_at = 1
+    sessionStorage.setItem('muneco_sesion', JSON.stringify(s))
+  })
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible()
+  const renovada = await page.evaluate(() => JSON.parse(sessionStorage.getItem('muneco_sesion')))
+  expect(renovada.token).not.toBe(sesion.token)
+})
+
+test('fechas de ventas: sin carga inicial, sin resultados y ventas propias del vendedor', async ({ page }) => {
+  const api = 'http://127.0.0.1:5059'
+  async function sesion(email) {
+    const r = await page.request.post(`${api}/api/auth/login`, { data: { email, password: 'Prueba123!' } })
+    expect(r.status()).toBe(200)
+    return (await r.json()).token
+  }
+  const admin = await sesion('admin@example.test')
+  const vendedor = await sesion('vendedor@example.test')
+  const adminHeaders = { Authorization: `Bearer ${admin}` }
+  const producto = await page.request.post(`${api}/api/productos`, { headers: adminHeaders,
+    data: { nombre: 'Producto filtro fechas', precio: 10, stock_inicial: 5 } })
+  expect(producto.status()).toBe(201)
+  const productoId = (await producto.json()).data.id
+  async function vender(token) {
+    const r = await page.request.post(`${api}/api/ventas`, { headers: { Authorization: `Bearer ${token}` },
+      data: { metodo_pago: 'EFECTIVO', items: [{ producto_id: productoId, cantidad: 1 }] } })
+    expect(r.status()).toBe(201)
+    return (await r.json()).data.venta.id
+  }
+  const propia = await vender(vendedor)
+  const ajena = await vender(admin)
+  const rango = `desde=${fechaBolivia()}&hasta=${fechaBolivia()}`
+  const propias = await (await page.request.get(`${api}/api/ventas?${rango}`, {
+    headers: { Authorization: `Bearer ${vendedor}` },
+  })).json()
+  expect(propias.data.some((v) => v.id === propia)).toBe(true)
+  expect(propias.data.some((v) => v.id === ajena)).toBe(false)
+  const todas = await (await page.request.get(`${api}/api/ventas?${rango}`, { headers: adminHeaders })).json()
+  expect(todas.data.some((v) => v.id === propia)).toBe(true)
+  expect(todas.data.some((v) => v.id === ajena)).toBe(true)
+
+  const consultas = []
+  page.on('request', (r) => {
+    if (r.method() === 'GET' && new URL(r.url()).pathname === '/api/ventas') consultas.push(r.url())
+  })
+  await page.goto('/login')
+  await page.getByLabel('Correo electrónico').fill('vendedor@example.test')
+  await page.getByLabel('Contraseña', { exact: true }).fill('Prueba123!')
+  await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible()
+  await page.getByRole('link', { name: 'Ventas', exact: true }).click()
+  await expect(page.getByText('Selecciona Desde y Hasta y pulsa Consultar ventas para ver el historial.')).toBeVisible()
+  expect(consultas).toHaveLength(0)
+  await page.getByLabel('Desde', { exact: true }).fill('2000-01-01')
+  await page.getByLabel('Hasta', { exact: true }).fill('2000-01-01')
+  await page.getByRole('button', { name: 'Consultar ventas' }).click()
+  await expect(page.getByText('No hay ventas en el periodo seleccionado.')).toBeVisible()
+  await page.getByLabel('Desde', { exact: true }).fill(fechaBolivia())
+  await page.getByLabel('Hasta', { exact: true }).fill(fechaBolivia())
+  await page.getByRole('button', { name: 'Consultar ventas' }).click()
+  const historial = page.getByRole('table').last()
+  await expect(historial.locator('tbody tr').filter({ hasText: `#${propia}` })).toBeVisible()
+  await expect(historial.locator('tbody tr').filter({ hasText: `#${ajena}` })).toHaveCount(0)
+  const antes = consultas.length
+  await page.getByRole('button', { name: 'Limpiar fechas' }).click()
+  await expect(page.getByText('Selecciona Desde y Hasta y pulsa Consultar ventas para ver el historial.')).toBeVisible()
+  expect(consultas).toHaveLength(antes)
 })

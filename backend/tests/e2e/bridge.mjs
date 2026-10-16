@@ -7,7 +7,9 @@ const { PGlite } = require('@electric-sql/pglite')
 const root = new URL('../../', import.meta.url)
 const db = new PGlite()
 await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-for (const archivo of ['schema.sql', 'migrations/001_operaciones_atomicas.sql', 'migrations/002_roles_tamanos_operacion.sql']) {
+for (const archivo of ['schema.sql', 'migrations/001_operaciones_atomicas.sql', 'migrations/002_roles_tamanos_operacion.sql',
+  'tests/e2e/auth_schema.sql', 'migrations/003_supabase_auth.sql', 'migrations/004_imagenes_storage.sql',
+  'migrations/005_eliminar_rol_heredado.sql']) {
   await db.exec(await readFile(new URL(archivo, root), 'utf8'))
 }
 await db.exec('SET ROLE service_role;')

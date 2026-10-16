@@ -14,6 +14,17 @@ export default function Productos() {
   const [id, setId] = useState(null)
   const [error, setError] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  async function subirImagen(e) {
+    const archivo = e.target.files?.[0]
+    if (!archivo) return
+    if (archivo.size > 5 * 1024 * 1024) { setError('La imagen admite como máximo 5 MB.'); e.target.value = ''; return }
+    setOcupado(true); setError('')
+    const datos = new FormData(); datos.append('imagen', archivo)
+    try {
+      const { data } = await api.post('/api/productos/imagen', datos)
+      setForm((actual) => ({ ...actual, imagen: data.url }))
+    } catch (err) { setError(mensajeError(err)) } finally { setOcupado(false); e.target.value = '' }
+  }
   function editar(p) { setId(p.id); setForm({ ...inicial, ...p, categoria_id: p.categoria_id || '', tamano: p.tamano || '', descripcion: p.descripcion || '', imagen: p.imagen || '' }); setError('') }
   function limpiar() { setId(null); setForm(inicial); setError('') }
   async function guardar(e) {
@@ -41,6 +52,10 @@ export default function Productos() {
               min={campo === 'precio' ? 0 : undefined} step={campo === 'precio' ? '0.01' : undefined}
               maxLength={campo === 'nombre' ? 100 : campo === 'tamano' ? 40 : undefined}
               value={form[campo]} onChange={(e) => setForm({ ...form, [campo]: e.target.value })} /></Form.Group>)}
+        <Form.Group className="col-md-6" controlId="producto-archivo"><Form.Label>Subir foto del producto</Form.Label>
+          <Form.Control type="file" accept="image/jpeg,image/png,image/webp" onChange={subirImagen} />
+          <Form.Text>JPEG, PNG o WebP, hasta 5 MB. Después guarda el producto para asociar la foto.</Form.Text>
+        </Form.Group>
         <Form.Group className="col-md-6" controlId="producto-categoria"><Form.Label>Categoría</Form.Label>
           <Form.Select value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}><option value="">Sin categoría</option>
             {categorias.data.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}

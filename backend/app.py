@@ -1,5 +1,6 @@
 import os
 import datetime
+import uuid
 from functools import wraps
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
@@ -7,19 +8,28 @@ from integrations import notificar_pedido, notificar_stock, responder_asistente
 from postgrest.exceptions import APIError
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from werkzeug.exceptions import RequestEntityTooLarge
 from dotenv import load_dotenv
-from werkzeug.security import generate_password_hash, check_password_hash
-import jwt
-from supabase import create_client, Client
+import httpx
+from auth_supabase import AuthFailure, solicitar, redireccion, sesion_publica, iniciar_sesion
+from supabase import create_client, Client, ClientOptions
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-SUPABASE_URL = os.getenv('SUPABASE_URL', '')
-SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
-JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', '').strip()
+
+@app.after_request
+def no_cache_auth(response):
+    if request.path.startswith('/api/auth/'):
+        response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def archivo_demasiado_grande(_error):
+    return jsonify({'status': 'error', 'mensaje': 'La imagen admite como máximo 5 MB.'}), 413
 
 def get_supabase_client() -> Client:
     url = os.getenv('SUPABASE_URL', '').strip()
@@ -32,7 +42,9 @@ def get_supabase_client() -> Client:
         url = url.split('/rest/v1')[0]
     url = url.rstrip('/')
 
-    return create_client(url, key)
+    return create_client(url, key, options=ClientOptions(
+        auto_refresh_token=False, persist_session=False,
+    ))
 
 # Validaciones compartidas: los datos del navegador no son confiables.
 def datos_json():
@@ -74,61 +86,35 @@ def precio_validado(valor):
         raise ValueError("El precio debe ser no negativo y tener como máximo dos decimales.") from None
 
 
-def clave_jwt():
-    if len(JWT_SECRET_KEY) < 32:
-        raise RuntimeError("Configure JWT_SECRET_KEY con al menos 32 caracteres aleatorios.")
-    return JWT_SECRET_KEY
+# Supabase Auth valida la identidad; los permisos siempre se leen de usuarios.
+def identidad_supabase(token):
+    identidad = solicitar('GET', '/user', token=token)
+    if not identidad.get('id'):
+        raise AuthFailure()
+    return identidad['id']
 
-
-# ==========================================
-# MIDDLEWARES / DECORADORES DE AUTENTICACIÓN
-# ==========================================
 
 def token_requerido(f):
     @wraps(f)
     def decorador(*args, **kwargs):
-        token = None
-        auth_header = request.headers.get('Authorization')
-
-        if auth_header:
-            partes = auth_header.split()
-            if len(partes) == 2 and partes[0] == 'Bearer':
-                token = partes[1]
-
-        if not token:
-            return jsonify({
-                "status": "error",
-                "mensaje": "Token de autenticación requerido. Inicie sesión para continuar."
-            }), 401
-
+        partes = request.headers.get('Authorization', '').split()
+        if len(partes) != 2 or partes[0] != 'Bearer':
+            return jsonify({'status': 'error', 'mensaje': 'Inicie sesión para continuar.'}), 401
         try:
-            payload = jwt.decode(token, clave_jwt(), algorithms=['HS256'],
-                                 options={'require': ['exp', 'usuario_id', 'roles']})
-            entero(payload.get('usuario_id'), 'usuario_id')
-            validar_roles(payload.get('roles'))
-            usuario = cargar_usuario(payload['usuario_id'])
+            auth_id = identidad_supabase(partes[1])
+            usuario = cargar_usuario(auth_id)
             if not usuario:
-                return jsonify({'status': 'error', 'mensaje': 'La cuenta ya no existe.'}), 401
-            usuario_actual = {**usuario, 'usuario_id': usuario['id']}
-            validar_roles(usuario_actual.get('roles'))
-        except jwt.ExpiredSignatureError:
-            return jsonify({
-                "status": "error",
-                "mensaje": "El token ha expirado. Inicie sesión nuevamente."
-            }), 401
-        except (jwt.InvalidTokenError, ValueError):
-            return jsonify({
-                "status": "error",
-                "mensaje": "Token de autenticación inválido."
-            }), 401
-
-        except RuntimeError:
-            return jsonify({"status": "error", "mensaje": "Autenticación no configurada en el servidor."}), 503
+                return jsonify({'status': 'error', 'mensaje': 'La cuenta no tiene un perfil habilitado.'}), 401
+            validar_roles(usuario.get('roles'))
+        except AuthFailure as error:
+            status = 401 if error.status in (400, 401, 403, 404, 422) else 503
+            return jsonify({'status': 'error', 'mensaje': 'La sesión no es válida. Inicie sesión nuevamente.'
+                            if status == 401 else 'No se pudo verificar la sesión. Intente nuevamente.'}), status
         except Exception:
-            app.logger.exception('No se pudo verificar la sesión')
-            return jsonify({'status': 'error', 'mensaje': 'No se pudo verificar la sesión. Intente nuevamente.'}), 503
-
-        return f(usuario_actual, *args, **kwargs)
+            # No registrar excepciones que puedan contener tokens o credenciales.
+            app.logger.error('No se pudo verificar la sesión en Supabase.')
+            return jsonify({'status': 'error', 'mensaje': 'No se pudo verificar la sesión. Revise la configuración y la migración 003.'}), 503
+        return f({**usuario, 'usuario_id': usuario['id']}, *args, **kwargs)
     return decorador
 
 ROLES = {'CLIENTE', 'VENDEDOR', 'ADMINISTRADOR'}
@@ -143,9 +129,9 @@ def validar_roles(roles):
     return roles
 
 
-def cargar_usuario(usuario_id):
+def cargar_usuario(auth_user_id):
     resultado = get_supabase_client().table('usuarios').select(
-        'id,nombre,email,roles,telefono,direccion,creado_en').eq('id', usuario_id).execute()
+        'id,nombre,email,roles,telefono,direccion,creado_en').eq('auth_user_id', auth_user_id).execute()
     return resultado.data[0] if resultado.data else None
 
 
@@ -168,6 +154,8 @@ def errores_api(f):
             return f(*args, **kwargs)
         except ValueError as error:
             return jsonify({'status': 'error', 'mensaje': str(error)}), 400
+        except RequestEntityTooLarge:
+            raise
         except APIError as error:
             if error.code == 'P0001':
                 return jsonify({'status': 'error', 'mensaje': error.message}), 400
@@ -242,143 +230,129 @@ def status():
 # MÓDULO DE AUTENTICACIÓN (AUTH)
 # ==========================================
 
-@app.route('/api/auth/registro', methods=['POST'])
+def error_auth(error):
+    if isinstance(error, ValueError):
+        return jsonify({'status': 'error', 'mensaje': str(error)}), 400
+    if isinstance(error, AuthFailure):
+        if error.status == 429:
+            return jsonify({'status': 'error', 'mensaje': 'Demasiados intentos. Espere unos minutos.'}), 429
+        if error.code == 'email_not_confirmed':
+            return jsonify({'status': 'error', 'mensaje': 'Confirme su correo antes de iniciar sesión.'}), 401
+        if error.code == 'weak_password':
+            return jsonify({'status': 'error', 'mensaje': 'La contraseña no cumple los requisitos configurados.'}), 400
+        if error.status < 500:
+            return jsonify({'status': 'error', 'mensaje': 'No se pudo autenticar. Revise sus datos o recupere el acceso.'}), 401
+    app.logger.error('No se pudo completar una operación de Supabase Auth.')
+    return jsonify({'status': 'error', 'mensaje': 'Autenticación no disponible. Revise Supabase y la migración 003.'}), 503
+
+
+def correo_validado(data):
+    email = texto(data, 'email', obligatorio=True, limite=150).lower()
+    if email.count('@') != 1 or any(c.isspace() for c in email) or not all(email.split('@')):
+        raise ValueError('El correo electrónico no es válido.')
+    return email
+
+
+def password_validado(data, nuevo=False):
+    password = texto(data, 'password', obligatorio=True, limite=256, recortar=False)
+    if not password.strip() or (nuevo and len(password) < 8):
+        raise ValueError('La contraseña nueva debe tener al menos 8 caracteres y no puede estar vacía.')
+    return password
+
+
+def respuesta_sesion(datos):
+    usuario = cargar_usuario(datos['user']['id'])
+    if not usuario:
+        raise RuntimeError('Falta el perfil de la identidad autenticada.')
+    validar_roles(usuario.get('roles'))
+    return jsonify({'status': 'success', **sesion_publica(datos), 'usuario': usuario})
+
+
+@app.post('/api/auth/registro')
 def registro():
     try:
         data = datos_json()
-        nombre = texto(data, 'nombre', limite=100)
-        email = texto(data, 'email', limite=150).lower()
-        password = texto(data, 'password', recortar=False)
+        nombre = texto(data, 'nombre', obligatorio=True, limite=100)
+        email = correo_validado(data)
+        password = password_validado(data, nuevo=True)
         telefono = texto(data, 'telefono', limite=20)
-        direccion = texto(data, 'direccion')
+        direccion = texto(data, 'direccion', limite=1000)
+        # Comprobar la migración antes de solicitar correo o crear una identidad.
+        db = get_supabase_client()
+        db.table('usuarios').select('auth_user_id').limit(0).execute()
+        datos = solicitar('POST', '/signup?' + redireccion('/auth/callback'), {
+            'email': email, 'password': password,
+            'data': {'nombre': nombre, 'telefono': telefono, 'direccion': direccion},
+        })
+        # Supabase puede ocultar si una cuenta ya existe. No devolver identidades
+        # ni asegurar creación: el mensaje es el mismo en ambos casos.
+        if datos.get('access_token'):
+            solicitar('POST', '/logout?scope=local', token=datos['access_token'])
+        return jsonify({'status': 'success', 'mensaje':
+            'Solicitud recibida. Si corresponde, recibirá un correo de confirmación. Luego podrá iniciar sesión.'}), 202
+    except Exception as error:
+        return error_auth(error)
 
-        if not nombre or not email or not password.strip():
-            return jsonify({
-                "status": "error",
-                "mensaje": "Los campos 'nombre', 'email' y 'password' son obligatorios."
-            }), 400
 
-        if len(password) < 6:
-            return jsonify({
-                "status": "error",
-                "mensaje": "La contraseña debe tener al menos 6 caracteres."
-            }), 400
-
-        if email.count('@') != 1 or any(c.isspace() for c in email) or not all(email.split('@')):
-            raise ValueError('El correo electrónico no es válido.')
-
-        supabase = get_supabase_client()
-
-        usuario_existente = supabase.table('usuarios').select('id').eq('email', email).execute()
-
-        if usuario_existente.data and len(usuario_existente.data) > 0:
-            return jsonify({
-                "status": "error",
-                "mensaje": "El correo electrónico ya se encuentra registrado."
-            }), 400
-
-        password_hash = generate_password_hash(password)
-
-        nuevo_usuario = {
-            'nombre': nombre,
-            'email': email,
-            'password_hash': password_hash,
-            'roles': ['CLIENTE'],
-            'telefono': telefono if telefono else None,
-            'direccion': direccion if direccion else None
-        }
-
-        resultado = supabase.table('usuarios').insert(nuevo_usuario).execute()
-
-        if not resultado.data:
-            raise Exception("No se pudo crear el registro del usuario en la base de datos.")
-
-        usuario_creado = resultado.data[0]
-
-        return jsonify({
-            "status": "success",
-            "mensaje": "Usuario registrado exitosamente.",
-            "data": {
-                "id": usuario_creado.get('id'),
-                "nombre": usuario_creado.get('nombre'),
-                "email": usuario_creado.get('email'),
-                "roles": usuario_creado.get('roles')
-            }
-        }), 201
-
-    except ValueError as e:
-        return jsonify({"status": "error", "mensaje": str(e)}), 400
-    except Exception as e:
-        print(f"[ERROR /api/auth/registro]: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "mensaje": "Error al procesar el registro. Consulte al administrador si el problema persiste."
-        }), 500
-
-@app.route('/api/auth/login', methods=['POST'])
+@app.post('/api/auth/login')
 def login():
     try:
         data = datos_json()
-        email = texto(data, 'email', limite=150).lower()
-        password = texto(data, 'password', recortar=False)
+        email = correo_validado(data)
+        password = password_validado(data)
+        datos = iniciar_sesion(get_supabase_client(), email, password)
+        return respuesta_sesion(datos)
+    except Exception as error:
+        return error_auth(error)
 
-        if not email or not password.strip():
-            return jsonify({
-                "status": "error",
-                "mensaje": "Debe proporcionar correo electrónico y contraseña."
-            }), 400
 
-        supabase = get_supabase_client()
+@app.post('/api/auth/renovar')
+def renovar_sesion():
+    try:
+        refresh = texto(datos_json(), 'refresh_token', obligatorio=True, limite=4096)
+        datos = solicitar('POST', '/token?grant_type=refresh_token', {'refresh_token': refresh})
+        return respuesta_sesion(datos)
+    except Exception as error:
+        return error_auth(error)
 
-        resultado = supabase.table('usuarios').select('*').eq('email', email).execute()
 
-        if not resultado.data or len(resultado.data) == 0:
-            return jsonify({
-                "status": "error",
-                "mensaje": "Credenciales inválidas. Verifique su correo o contraseña."
-            }), 401
+@app.post('/api/auth/recuperar')
+def recuperar_acceso():
+    try:
+        email = correo_validado(datos_json())
+        solicitar('POST', '/recover?' + redireccion('/restablecer'), {'email': email})
+        return jsonify({'status': 'success', 'mensaje':
+            'Si la cuenta permite recuperar el acceso, recibirá un enlace en su correo.'})
+    except AuthFailure as error:
+        if error.status in (400, 404, 422):
+            return jsonify({'status': 'success', 'mensaje':
+                'Si la cuenta permite recuperar el acceso, recibirá un enlace en su correo.'})
+        return error_auth(error)
+    except Exception as error:
+        return error_auth(error)
 
-        usuario = resultado.data[0]
 
-        if not check_password_hash(usuario.get('password_hash', ''), password):
-            return jsonify({
-                "status": "error",
-                "mensaje": "Credenciales inválidas. Verifique su correo o contraseña."
-            }), 401
+@app.post('/api/auth/logout')
+@token_requerido
+def logout(_usuario):
+    try:
+        solicitar('POST', '/logout?scope=local', token=request.headers['Authorization'].split()[1])
+        return jsonify({'status': 'success'})
+    except Exception as error:
+        return error_auth(error)
 
-        expiracion = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
-        payload = {
-            'usuario_id': usuario.get('id'),
-            'nombre': usuario.get('nombre'),
-            'email': usuario.get('email'),
-            'roles': validar_roles(usuario.get('roles')),
-            'exp': expiracion
-        }
 
-        token = jwt.encode(payload, clave_jwt(), algorithm='HS256')
-
-        return jsonify({
-            "status": "success",
-            "mensaje": "Inicio de sesión exitoso.",
-            "token": token,
-            "usuario": {
-                "id": usuario.get('id'),
-                "nombre": usuario.get('nombre'),
-                "email": usuario.get('email'),
-                "roles": usuario.get('roles'),
-                "telefono": usuario.get('telefono'),
-                "direccion": usuario.get('direccion')
-            }
-        }), 200
-
-    except ValueError as e:
-        return jsonify({"status": "error", "mensaje": str(e)}), 400
-    except Exception as e:
-        print(f"[ERROR /api/auth/login]: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "mensaje": "Error al procesar el inicio de sesión. Consulte al administrador si el problema persiste."
-        }), 500
+@app.put('/api/auth/password')
+@token_requerido
+def cambiar_password(_usuario):
+    try:
+        password = password_validado(datos_json(), nuevo=True)
+        token = request.headers['Authorization'].split()[1]
+        solicitar('PUT', '/user', {'password': password}, token=token)
+        solicitar('POST', '/logout?scope=global', token=token)
+        return jsonify({'status': 'success', 'mensaje': 'Contraseña actualizada. Inicie sesión nuevamente.'})
+    except Exception as error:
+        return error_auth(error)
 
 @app.route('/api/auth/perfil', methods=['GET'])
 @token_requerido
@@ -413,6 +387,32 @@ def perfil(usuario_actual):
 # ==========================================
 # MÓDULO CRUD DE PRODUCTOS
 # ==========================================
+
+@app.post('/api/productos/imagen')
+@token_requerido
+@rol_requerido('ADMINISTRADOR')
+@errores_api
+def subir_imagen(_usuario):
+    request.max_content_length = 6 * 1024 * 1024  # Incluye el contenedor multipart.
+    archivo = request.files.get('imagen')
+    if not archivo:
+        raise ValueError('Seleccione una imagen JPEG, PNG o WebP.')
+    contenido = archivo.read(5 * 1024 * 1024 + 1)
+    if len(contenido) > 5 * 1024 * 1024:
+        return jsonify({'status': 'error', 'mensaje': 'La imagen admite como máximo 5 MB.'}), 413
+    if contenido.startswith(b'\x89PNG\r\n\x1a\n'):
+        extension, mime = 'png', 'image/png'
+    elif contenido.startswith(b'\xff\xd8\xff'):
+        extension, mime = 'jpg', 'image/jpeg'
+    elif contenido[:4] == b'RIFF' and contenido[8:12] == b'WEBP':
+        extension, mime = 'webp', 'image/webp'
+    else:
+        raise ValueError('Formato no admitido. Use JPEG, PNG o WebP.')
+    bucket = get_supabase_client().storage.from_('productos')
+    ruta = f'{uuid.uuid4().hex}.{extension}'
+    bucket.upload(ruta, contenido, {'content-type': mime, 'upsert': 'false'})
+    return jsonify({'status': 'success', 'url': bucket.get_public_url(ruta)}), 201
+
 
 @app.route('/api/productos', methods=['GET'])
 def obtener_productos():
@@ -814,7 +814,9 @@ def crear_venta(usuario_actual):
 @rol_requerido('ADMINISTRADOR', 'VENDEDOR')
 @errores_api
 def listar_ventas(usuario_actual):
-    consulta = get_supabase_client().table('ventas').select('*,usuarios(nombre)').order('id', desc=True)
+    rango = rango_consulta_obligatorio()
+    consulta = get_supabase_client().table('ventas').select('*,usuarios(nombre)').gte(
+        'fecha_venta', rango['p_desde']).lt('fecha_venta', rango['p_hasta']).order('id', desc=True)
     # El vendedor consulta sus ventas; el administrador puede consultar todas.
     if 'ADMINISTRADOR' not in usuario_actual['roles']:
         consulta = consulta.eq('vendedor_id', usuario_actual['usuario_id'])
@@ -826,8 +828,15 @@ def listar_ventas(usuario_actual):
 @rol_requerido('ADMINISTRADOR')
 @errores_api
 def listar_usuarios(usuario_actual):
-    return pagina_consulta(get_supabase_client().table('usuarios').select(
-        'id,nombre,email,roles,telefono,creado_en').order('id'))
+    email = request.args.get('email', '').strip().lower()
+    if len(email) > 150 or any(c.isspace() or c in '%*\\' for c in email):
+        raise ValueError('Busque por correo o parte del correo, sin espacios ni comodines.')
+    consulta = get_supabase_client().table('usuarios').select(
+        'id,nombre,email,roles,telefono,creado_en').order('id')
+    if email:
+        # Tratar el guion bajo como carácter literal, no como comodín SQL.
+        consulta = consulta.ilike('email', '%' + email.replace('_', '\\_') + '%')
+    return pagina_consulta(consulta)
 
 
 @app.put('/api/usuarios/<int:usuario_id>/roles')
@@ -856,13 +865,20 @@ def rango_reporte(desde=None, hasta=None):
             'p_hasta': datetime.datetime.combine(fin + datetime.timedelta(days=1), datetime.time.min, zona).isoformat()}
 
 
+def rango_consulta_obligatorio():
+    desde, hasta = request.args.get('desde'), request.args.get('hasta')
+    if not desde or not hasta:
+        raise ValueError('Seleccione las fechas Desde y Hasta para consultar.')
+    return rango_reporte(desde, hasta)
+
+
 @app.get('/api/reportes/ventas')
 @token_requerido
 @rol_requerido('ADMINISTRADOR')
 @errores_api
 def reportes(usuario_actual):
-    resultado = get_supabase_client().rpc('reporte_ventas', rango_reporte(
-        request.args.get('desde'), request.args.get('hasta'))).execute()
+    rango = rango_consulta_obligatorio()
+    resultado = get_supabase_client().rpc('reporte_ventas', rango).execute()
     return jsonify({'status': 'success', 'data': resultado.data})
 
 

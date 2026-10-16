@@ -34,6 +34,7 @@ export default function Login() {
         <Form.Control type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></Form.Group>
       <Button type="submit" disabled={enviando}>{enviando ? 'Ingresando...' : 'Iniciar sesión'}</Button>
     </Form>
+    <Link className="d-block mt-3" to="/recuperar">Olvidé mi contraseña</Link>
     <p className="mt-3">¿No tienes cuenta? <Link to="/registro">Regístrate</Link></p>
   </Card.Body></Card></Col></Row>
 }
