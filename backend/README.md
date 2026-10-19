@@ -138,6 +138,8 @@ Diagnóstico previo de solo lectura sobre el Supabase configurado:
 `venv/bin/python verificar_supabase.py` desde `backend/`.
 Comprueba acceso a las tablas y columnas requeridas, cuenta usuarios por rol y
 lista hasta 50 IDs de pedidos no terminales cuyo stock sigue sin conciliar.
+También comprueba la ausencia de la columna heredada `rol` y consulta la
+configuración del bucket `productos`, sin descargar perfiles ni imágenes.
 No muestra claves ni datos personales y no modifica registros. Un resultado
 correcto no sustituye la aceptación de compra, cobro y permisos en el navegador.
 
@@ -168,8 +170,31 @@ con Auth simulado. No comprueba PostgREST, envío de correo ni Storage real.
 ejecutarse en producción. El runner aplica las migraciones hasta 005 y vuelve
 a probar la autorización y vinculación de Auth sin la columna heredada. La
 prueba SQL compara los datos antes/después de limpiar para detectar pérdidas.
-Compras concurrentes con sesiones independientes y servicios externos siguen
-requiriendo validación en el entorno real.
+### Concurrencia con PostgreSQL independiente
+
+Desde la raíz del proyecto, con los binarios de PostgreSQL disponibles:
+
+```bash
+python3 backend/tests/concurrencia.py --pg-bin /usr/lib/postgresql/16/bin
+```
+
+El runner crea un clúster temporal, aplica el esquema y las migraciones 001–005,
+y prueba con dos conexiones independientes usando `service_role`. Observa en
+`pg_stat_activity` que la segunda operación espera un bloqueo antes de confirmar
+o revertir la primera. Comprueba cuatro casos: compra de la última unidad,
+compra después de un rollback, cancelación simultánea y cobro duplicado. Verifica
+stock, pedidos/detalles, historial y ventas resultantes.
+
+No carga `.env`, no acepta una URL de conexión y no utiliza Supabase. Solo abre
+un socket Unix privado; detiene y elimina el clúster al finalizar. Ejecutarlo
+como usuario normal. Si se usan paquetes extraídos en una carpeta temporal,
+se pueden indicar `--pg-lib` (bibliotecas) y `--pg-share` (directorio con
+`postgres.bki`). No requiere dependencias Python adicionales.
+
+Los cuatro escenarios pasaron el 19 de octubre de 2026 en PostgreSQL 16.15.
+Esto verifica las funciones SQL con sesiones concurrentes, pero no mide carga
+HTTP ni latencia del despliegue. Los servicios externos y el correo siguen
+requiriendo configuración y aceptación en el entorno real.
 
 Referencias: [bloqueos PostgreSQL](https://www.postgresql.org/docs/current/explicit-locking.html),
 [claves Supabase](https://supabase.com/docs/guides/getting-started/api-keys),

@@ -2,7 +2,7 @@
 
 Proyecto de titulación — Ingeniería de Sistemas.
 Inicio: 4 de septiembre de 2026. Entrega objetivo: 10 de noviembre de 2026.
-Estado revisado: 15 de octubre de 2026.
+Estado revisado: 19 de octubre de 2026.
 
 ## Criterio de avance
 
@@ -13,7 +13,28 @@ código implementado con despliegue o servicio externo operativo.
 
 ## Resumen de avance
 
-**Avance del plan original: 84 % (42 de 50 tareas marcadas; quedan 8).**
+**Avance del plan original: 88 % (44 de 50 tareas marcadas; quedan 6).**
+
+**Sin las tareas del asistente: 93,3 % (42 de 45 tareas marcadas; quedan 3).**
+Se excluyen cinco casillas completas, sin borrarlas ni dividirlas: código del
+asistente, restricción de sus herramientas, configuración del proveedor y las
+dos verificaciones conjuntas de notificaciones/LLM (Sprint 5 y buffer). Dos de
+esas cinco están marcadas. El consumo de productos se mantiene porque es un
+reporte independiente, aunque también lo consulten las herramientas del asistente.
+El código y la configuración de notificaciones de Telegram se mantienen en el
+indicador. Excluir las verificaciones conjuntas no significa que los avisos
+reales estén comprobados: su entrega sigue pendiente.
+
+**Total técnico sin asistente, incluyendo la ampliación Auth/Storage ya existente:
+88,9 % (48 de 54 tareas).** Son 42/45 del plan original más 6/9 de Auth/Storage.
+Las nueve tareas de esa ampliación ya estaban registradas antes de esta sesión;
+no se han añadido ahora. La recuperación aceptada no cierra por sí sola su casilla
+agrupada de confirmación, sesiones y enlaces vencidos. Este total deja seis
+casillas abiertas: tres del plan original y tres de la ampliación.
+
+Estos porcentajes corresponden a la lista técnica del repositorio y **no miden
+la cobertura completa del documento académico**. La comparación con las historias
+ya escritas en su Tabla 6 se presenta abajo; no se agregan tareas a los sprints.
 
 Se cuentan únicamente las tareas de los cinco sprints y del buffer final;
 el resumen repite tareas y no se cuenta nuevamente. Cada tarea tiene el mismo
@@ -26,21 +47,23 @@ El valor debe recalcularse cuando cambien las tareas o sus estados.
 |---|---|---|
 | Sprint 1 | 5 / 5 | 100 % |
 | Sprint 2 | 8 / 8 | 100 % |
-| Sprint 3 | 10 / 11 | 91 % |
+| Sprint 3 | 11 / 11 | 100 % |
 | Sprint 4 | 9 / 9 | 100 % |
 | Sprint 5 | 6 / 9 | 67 % |
-| Buffer final | 4 / 8 | 50 % |
-| **Total** | **42 / 50** | **84 %** |
+| Buffer final | 5 / 8 | 63 % |
+| **Total** | **44 / 50** | **88 %** |
 
 El estudiante acepta el flujo de compra y operación al cierre del 15 de octubre.
-Sprint 4 completado. Sprint 3 conserva pendiente la conciliación del pedido #1;
-Sprint 5 y el buffer conservan las verificaciones externas y académicas pendientes.
+Sprint 4 completado. La conciliación del pedido #1 cierra la lista del Sprint 3
+el 19 de octubre. Sprint 5 y el buffer conservan las verificaciones externas y
+académicas pendientes. El cierre de estas casillas no resuelve las diferencias
+con las historias del documento identificadas en esta revisión.
 
 | Área | Estado |
 |---|---|
 | Vistas base, rutas, catálogo y carrito | Implementadas |
 | API Flask, Supabase y esquema inicial | Implementados |
-| Login, sesión y pedidos del cliente con Axios | Flujo operativo aceptado por el estudiante; confirmación/recuperación por correo pendientes |
+| Login, sesión y pedidos del cliente con Axios | Flujo operativo aceptado; recuperación por Gmail y login con contraseña nueva confirmados por el estudiante; confirmación de registro pendiente |
 | Roles combinables y tamaños con precio/stock propios | Implementados; aceptación del flujo informada por el estudiante |
 | Panel del vendedor: pedidos, ventas y tipo de pago | Implementado; operación aceptada por el estudiante |
 | Panel del administrador: productos, categorías, inventario, usuarios y roles | Implementado; aceptación operativa informada por el estudiante |
@@ -50,7 +73,8 @@ Sprint 5 y el buffer conservan las verificaciones externas y académicas pendien
 La conexión por Axios incluye ahora catálogo, autenticación, pedidos y paneles.
 Verificación local actual: 41 pruebas Python, tres recorridos de navegador
 y migraciones 001–005 aprobadas; ESLint y compilación correctos. Login administrativo real en Auth comprobado y
-bucket de Storage configurado. La recuperación por correo, las fotos reales y
+bucket de Storage configurado. Recuperación por Gmail y acceso con contraseña
+nueva aceptados por el estudiante el 19 de octubre. Las fotos reales y
 las comprobaciones específicas de servicios externos siguen pendientes. La
 aceptación del flujo operativo fue informada por el estudiante al finalizar el día.
 
@@ -134,8 +158,9 @@ pendientes corresponden a configuración externa y aceptación en el entorno rea
 
 Se utiliza `usuarios.roles`, un arreglo PostgreSQL con uno o varios valores de
 CLIENTE, VENDEDOR y ADMINISTRADOR. La migración copia el rol de cada usuario
-existente. La migración 005 está preparada para retirar la columna antigua `rol`;
-el código actual no la utiliza para autorizar. Su ejecución real sigue pendiente.
+existente. La migración 005 retira la columna antigua `rol`; el código actual no
+la utiliza para autorizar. El 19 de octubre se confirmó en Supabase que `rol`
+ya no existe y `roles` permanece accesible.
 
 Supabase Auth emite el JWT de identidad. Flask lo valida con Auth y consulta
 `usuarios.roles` mediante `auth_user_id` en cada solicitud protegida: quitar un
@@ -186,7 +211,7 @@ Objetivo: API REST de productos, pedidos y autenticación.
 - [x] Aplicar migración 001 en Supabase (ejecución informada por el estudiante).
 - [x] Verificar pedidos e inventario en el Supabase real.
 
-## Sprint 3 — 2 al 14 de octubre
+## Sprint 3 — 30 de septiembre al 12 de octubre
 
 Objetivo: cliente conectado y autorización con roles combinables.
 Las correcciones de base cubren la transición después del Sprint 2.
@@ -201,9 +226,11 @@ Las correcciones de base cubren la transición después del Sprint 2.
 - [x] Confirmar ejecución correcta de migración 002 en Supabase.
 - [x] Comprobar login de usuarios existentes con los nuevos roles.
 - [x] Aceptar flujo completo de compra en el entorno real (confirmado por el estudiante al cierre del 15 de octubre).
-- [ ] Conciliar si los pedidos anteriores descontaron stock antes de permitir su cancelación.
+- [x] Conciliar si los pedidos anteriores descontaron stock antes de permitir su cancelación.
+      Pedido #1: descuento confirmado por el estudiante tras revisar Supabase;
+      `stock_descontado` actualizado de NULL a TRUE el 19 de octubre, sin escribir inventario.
 
-## Sprint 4 — 14 al 26 de octubre
+## Sprint 4 — 12 al 24 de octubre
 
 Objetivo: gestión operativa del administrador y vendedor.
 
@@ -217,7 +244,7 @@ Objetivo: gestión operativa del administrador y vendedor.
 - [x] Impedir quitar el último administrador y registrar cobros duplicados.
 - [x] Validar la operación en Supabase con cuentas de cada rol (aceptación del flujo informada por el estudiante).
 
-## Sprint 5 — 26 de octubre al 7 de noviembre
+## Sprint 5 — 24 de octubre al 5 de noviembre
 
 Objetivo: reportes e integraciones.
 
@@ -232,35 +259,39 @@ Objetivo: reportes e integraciones.
       opción con OpenAI Responses; cambiar proveedor requerirá su adaptador.
 - [ ] Comprobar entrega real de notificaciones y respuestas del LLM.
 
-## Buffer final — 7 al 10 de noviembre
+## Buffer final — 5 al 10 de noviembre
 
-La ampliación de roles y el ajuste de fechas dejan tres días de estabilización.
+Fechas alineadas con la Tabla 9 del documento académico; se conservan las tareas.
 
 - [x] Pruebas locales de validación y autorización por rol y combinaciones.
 - [x] Pruebas SQL aisladas de transacciones, tamaños, estados y ventas.
 - [x] Flujo de navegador React → Axios → Flask → PostgreSQL aislado: cliente,
       vendedor, administrador, catálogo, compra, cobros, CRUD, inventario y roles.
 - [x] Completar aceptación de flujos operativos de extremo a extremo en Supabase (confirmación del estudiante; integraciones externas se validan aparte).
-- [ ] Probar compras simultáneas con conexiones PostgreSQL independientes.
+- [x] Probar compras simultáneas con conexiones PostgreSQL independientes
+      (19 de octubre: cuatro escenarios en PostgreSQL 16.15 temporal).
 - [ ] Verificar notificaciones y asistente con servicios reales.
 - [ ] Revisar documentación académica, diagramas UML y casos de uso.
 - [ ] Ensayar la sustentación y registrar evidencias del sistema funcionando.
 
 ## Pendientes técnicos y decisiones
 
-**RF-04 resuelto por el estudiante:** cada tamaño tiene precio y stock propios.
+**RF-04, tamaños implementados:** cada tamaño tiene precio y stock propios.
 Cada fila de `productos` es una opción vendible: por ejemplo, Pizza Margarita
 Mediana y Pizza Margarita Familiar tienen IDs distintos. Catálogo agrupa por
 nombre/categoría y permite elegir tamaño. Se conserva el modelo de inventario
 por producto y se guardan nombre/tamaño/precio en el detalle histórico del pedido.
 Los productos existentes sin tamaño conservan su ID y su disponibilidad.
+La selección de hasta dos sabores en mitades iguales, precisada el 19 de octubre,
+sigue pendiente; no se considera cubierta por la implementación de tamaños.
 
 **Pagos:** EFECTIVO, QR y TARJETA son registros del método recibido; el sistema no
 procesa pagos bancarios. Un pedido entregado se convierte en venta al registrar
 su cobro. Una venta en local crea pedido, detalles, descuento y cobro juntos.
 
-**Consumo semanal:** mide unidades de productos de pedidos no cancelados. No se
-ha solicitado ni modelado un inventario de ingredientes o recetas.
+**Consumo semanal:** actualmente mide unidades de productos de pedidos no cancelados.
+El 19 de octubre se solicitó incorporar control de insumos en la siguiente etapa;
+todavía no se han modelado ingredientes ni recetas.
 
 **Instalación:** aplicar las migraciones 001 a 005 en orden, sin repetir las ya
 aplicadas. No volver a crear las tablas de una base existente. Para la ampliación
@@ -269,8 +300,8 @@ del panel no se ejecutan automáticamente.
 
 ## Ampliación solicitada — Supabase Auth y Storage
 
-Solicitada el 15 de octubre. Se conserva el indicador del plan original de
-**42/50 (84 %)**; esta ampliación se informa aparte y requiere reestimar el trabajo
+Solicitada el 15 de octubre, cuando el indicador original era **42/50 (84 %)**.
+El indicador vigente es **44/50 (88 %)**; esta ampliación se informa aparte y requiere reestimar el trabajo
 restante después de la activación real. Código preparado no equivale a servicio
 activado.
 
@@ -288,6 +319,8 @@ activado.
 - [ ] Configurar Auth, URLs de retorno y correo SMTP en el panel.
 - [ ] Validar migración del administrador, confirmación, recuperación, cierre y
       renovación con Auth real; comprobar enlaces vencidos/usados del proveedor.
+      Recuperación por Gmail y login con contraseña nueva aceptados por el estudiante
+      el 19 de octubre. La casilla agrupa otros flujos aún por verificar.
 - [ ] Validar subida y visualización de fotos con Storage real y los permisos.
 
 Comprobación tras activar las migraciones: Auth por correo habilitado, registro
@@ -308,7 +341,8 @@ Limpieza solicitada: 005 elimina únicamente `usuarios.rol`. Las ocho tablas
 operativas tienen uso; `password_hash` se mantiene para las cuentas todavía sin
 migrar y `stock_descontado` para cancelar sin duplicar inventario. Pruebas SQL
 aprobadas con comparación de datos antes/después y validación de roles/Auth
-sin el campo antiguo. Aplicación de 005 en Supabase pendiente de confirmación.
+sin el campo antiguo. El 19 de octubre se confirmó en Supabase la ausencia de
+`rol` y el acceso a `roles`.
 
 Filtros solicitados: búsqueda de usuarios por correo parcial/completo en el
 servidor; historial de ventas y reportes requieren Desde/Hasta y consulta
@@ -326,8 +360,8 @@ aunque se revoquen los refresh tokens al cerrar sesión/cambiar contraseña.
 
 Ya utilizamos PostgreSQL, funciones RPC y RLS. Realtime queda para evaluación
 posterior; requiere políticas propias de suscripción. Telegram y LLM siguen
-requiriendo sus proveedores. No se ha cambiado el alcance a inventario de
-ingredientes ni a cobros bancarios.
+requiriendo sus proveedores. El control de insumos se incorpora al trabajo
+solicitado para la siguiente etapa; los cobros bancarios siguen fuera de alcance.
 
 **Credenciales de servicios externos:** son distintas de la contraseña del
 usuario de la pizzería. Si una clave se pierde, se debe recuperar el acceso a
@@ -335,6 +369,96 @@ la cuenta del proveedor y consultar o generar una clave nueva con sus mecanismos
 oficiales; después actualizar `backend/.env` y reiniciar Flask. Mantener una
 copia segura en un gestor de contraseñas, fuera de Git y de la documentación
 pública. No pegar claves reales en este archivo.
+
+## Continuación — 19 de octubre de 2026
+
+Se prioriza cerrar los pendientes del plan existente antes de incorporar pizzas
+de dos mitades, CAPTCHA y control de insumos. Telegram sigue contemplado: además
+de activar las notificaciones, falta recibir consultas desde el bot y conectarlas
+al asistente. Los roles combinables se conservan. El estudiante actualizará la
+descripción de autenticación en su documento académico.
+
+### Evidencia de esta sesión
+
+- 41 pruebas Python aprobadas; ESLint y compilación del frontend correctos.
+- Cuatro pruebas nuevas de concurrencia aprobadas en PostgreSQL 16.15 con
+  conexiones independientes: última unidad, rollback, cancelación y cobro.
+  Runner reproducible: `backend/tests/concurrencia.py`. El clúster temporal se
+  detuvo y eliminó; no se escribieron datos de prueba en Supabase.
+- Diagnóstico de lectura en Supabase: 3 categorías, 5 productos, 5 inventarios,
+  4 usuarios, 5 pedidos, 5 detalles, 1 venta y 6 cambios de estado. Hay 2 cuentas
+  con ADMINISTRADOR, 2 con CLIENTE y ninguna con VENDEDOR actualmente.
+- El pedido #1 mantiene `stock_descontado=NULL` y está sin conciliar. Dos perfiles
+  siguen sin vincular a Auth. No se infiere el stock histórico ni la titularidad
+  de las cuentas a partir de esos conteos.
+- Storage: bucket `productos` público, límite 5 MB, JPEG/PNG/WebP. Auth: proveedor
+  Email habilitado y confirmación requerida. Estas consultas no demuestran envío
+  de correos ni subida de fotos desde la aplicación.
+- Migración 005 confirmada por consulta de esquema: `usuarios.rol` no existe
+  (código PostgreSQL 42703) y `usuarios.roles` es accesible. No se repitió la migración.
+- El estudiante informa que no ha configurado SMTP personalizado, URLs de retorno,
+  bot de Telegram ni proveedor del asistente. Posteriormente confirma que recibió
+  la recuperación por Gmail y pudo entrar con la contraseña nueva. Esto acepta
+  ese flujo con la cuenta probada, sin inferir qué servicio SMTP realizó el envío.
+- La subida de una foto desde Productos sigue sin probarse, según el estudiante.
+- El estudiante confirma que el pedido #1 sí descontó stock y que lo revisó en
+  Supabase. Con esa evidencia informada se actualizó únicamente `stock_descontado`
+  de NULL a TRUE, condicionado a que siguiera EN_PREPARACION y sin conciliar.
+  La lectura posterior confirmó EN_PREPARACION/TRUE; no se escribió inventario.
+  Se cierra la tarea de conciliación. No se dispone de una captura del stock
+  anterior: la fuente es la confirmación del estudiante.
+
+### Correspondencia con el documento, sin ampliar sprints
+
+Por instrucción del estudiante, cualquier tarea nueva o ampliación de los sprints
+debe consultarse antes de incorporarla. Se mantienen las 50 casillas existentes;
+las fechas de sus encabezados se alinean con la Tabla 9 del documento. El asistente
+y sus consultas por Telegram se trabajan al final. Las notificaciones automáticas
+son independientes del LLM y pueden configurarse antes.
+
+La Tabla 6 de `proyecto_grado.odt` ya contiene estas historias. Esta es una
+comparación con el código, no una nueva lista de tareas ni una modificación del
+ODT. «Implementada» describe código disponible, no todas las pruebas externas.
+
+| Historias existentes | Cobertura actual |
+|---|---|
+| HU-01, HU-02, HU-03, HU-04, HU-05 | Implementadas: acceso, catálogo, carrito, pedido e historial |
+| HU-06 | Pendiente: elegir mesa o para llevar; actualmente se solicita dirección de entrega |
+| HU-07 | Pendiente: reserva con hora requerida; no hay campo ni flujo para programarla |
+| HU-08, HU-09 | Implementadas: gestión de productos y registro del tipo de pago |
+| HU-10 | Parcial: inventario de productos implementado; insumos pendientes |
+| HU-11 | Parcial: mínimos de productos implementados; mínimos de insumos pendientes |
+| HU-12 | Parcial: código de avisos Telegram para productos; faltan activación real e insumos |
+| HU-13 | Implementada: reportes de ventas |
+| HU-14 | Pendiente: consumo semanal de insumos; el reporte actual mide productos |
+| HU-15, HU-16 | Se apartan del indicador documental del asistente/Telegram para el final |
+
+**Cobertura por historias del documento sin HU-15/HU-16: 8 de 14 implementadas
+(57,1 %), 3 parciales y 3 pendientes.** Las parciales no reciben puntuación
+arbitraria. Este indicador cuenta historias, no las 45 tareas técnicas, y tampoco
+mide horas de trabajo. RF-04 precisa además dos sabores en una pizza, todavía
+pendiente; CAPTCHA aparece en el marco teórico y su incorporación fue solicitada,
+pero no se crea por eso una nueva casilla del sprint sin consulta.
+
+La revisión de la Figura 24 encontró que «Realizar pedido» incluye «Registrar
+venta». En el código, un pedido web solo se cobra después de entregarse: deben
+representarse como casos distintos y asociar el cobro al vendedor/administrador.
+Falta representar al vendedor, que sí aparece en la Tabla 8. También hay que
+resolver la correspondencia de HU-06/HU-07 con el diagrama. El documento desarrolla
+los incrementos hasta Sprint 3; Sprint 4/5 y los modelos anunciados requieren
+completarse. Estas observaciones pertenecen a la tarea de revisión ya existente.
+
+### Orden para continuar
+
+1. Validar subida y visualización de una foto desde Productos y los permisos.
+2. Completar las comprobaciones de confirmación/URLs y revisar el proveedor SMTP
+   para envío a clientes. La recuperación y el login con contraseña nueva ya se
+   aceptaron; no se exige repetirlos para continuar con otras tareas.
+3. Configurar bot/chat y comprobar los avisos automáticos contemplados en el plan.
+4. Completar la revisión documental, los diagramas y el ensayo dentro de las
+   tareas existentes. Consultar antes de agregar o redistribuir tareas para cerrar
+   las diferencias de cobertura indicadas arriba.
+5. Al final, configurar y validar el asistente y sus consultas por Telegram.
 
 ## Metodología
 

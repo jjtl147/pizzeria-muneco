@@ -60,8 +60,12 @@ Crear un pedido realiza en una transacción: validación de disponibilidad,
 cálculo del total, cabecera, detalles y descuento de stock. Un error revierte
 las escrituras. Esto demuestra atomicidad y mantiene la consistencia del negocio.
 Los bloqueos por fila serializan compras del mismo producto; se adquieren en
-orden de ID para reducir conflictos. Las pruebas aisladas verifican rollback;
-la prueba de concurrencia con sesiones independientes se debe hacer en PostgreSQL.
+orden de ID para reducir conflictos. Las pruebas aisladas verifican rollback.
+`backend/tests/concurrencia.py` comprueba con sesiones independientes de
+PostgreSQL la última unidad, una compra tras rollback, dos cancelaciones y dos
+cobros simultáneos. El runner observa el bloqueo antes de liberar la primera
+transacción y comprueba los datos finales. Los cuatro casos pasaron el 19 de
+octubre de 2026 en PostgreSQL 16.15 temporal.
 
 Cancelar bloquea el pedido y devuelve stock una sola vez.
 La marca `stock_descontado` impide devolver cantidades que nunca se reservaron.
@@ -80,8 +84,9 @@ Se registra EFECTIVO, QR o TARJETA; no se realiza una transacción bancaria.
 Los reportes usan ventas registradas, no pedidos pendientes. PostgreSQL agrega
 los datos para evitar totales incompletos por límites de listado. Se consulta por
 fechas en horario de Bolivia y se muestran productos, tamaños, pagos y ventas diarias.
-El consumo semanal representa productos reservados/vendidos en pedidos no cancelados,
-no ingredientes: no hay tablas de recetas o materias primas en el alcance actual.
+El consumo semanal representa productos reservados/vendidos en pedidos no cancelados.
+Todavía no hay tablas de recetas o materias primas. El control de insumos fue
+solicitado el 19 de octubre para la siguiente etapa de implementación.
 
 ## Asistente y Telegram
 
@@ -102,13 +107,15 @@ Bot, chat y credenciales todavía deben configurarse y probarse.
   revocación de roles con JWT vigente e integraciones simuladas.
 - Pruebas SQL: migración de usuarios, atomicidad, stock por tamaño, estados,
   devolución de stock, cobros duplicados y reportes, en PostgreSQL PGlite aislado.
+- Concurrencia: cuatro escenarios con conexiones PostgreSQL independientes,
+  observación de bloqueos y comprobación del stock, historial y ventas finales.
 - Prueba de navegador: React, Axios, Flask real y PostgreSQL mediante adaptador local.
   Incluye cliente, vendedor, administrador y recuperación/renovación con Auth
   simulado. No se conecta al Supabase del estudiante.
 - Build y ESLint comprueban compilación y reglas de JavaScript; no prueban el negocio.
 
-Para el cierre académico se necesitan también pruebas en Supabase, concurrencia
-con sesiones independientes, Telegram/LLM reales, diagramas revisados y aceptación.
+Para el cierre académico se necesitan también las pruebas específicas pendientes
+de Auth/Storage en Supabase, Telegram/LLM reales, diagramas revisados y aceptación.
 El código implementado no equivale a todo el sistema desplegado y aceptado.
 
 ## Demostración sugerida
@@ -121,3 +128,94 @@ El código implementado no equivale a todo el sistema desplegado y aceptado.
 6. Retirar un rol y demostrar que el token anterior no concede ese permiso.
 7. Mostrar reportes de las ventas y pruebas de cancelación/cobro duplicado.
 8. Demostrar Telegram y asistente cuando estén configurados; explicar sus límites.
+
+## Revisión del documento académico — 19 de octubre
+
+Esta revisión corresponde a la tarea documental ya existente del buffer. No
+agrega tareas a los sprints ni modifica `proyecto_grado.odt`. El asistente se
+reserva para el final por decisión del estudiante.
+
+Se contrastaron requerimientos (Tablas 4/5), historias (Tabla 6), actores
+(Tabla 8), planificación (Tabla 9), incrementos escritos y la imagen de la
+Figura 24 con el código. La planificación técnica conserva sus casillas, pero
+no cubre por sí sola todo el alcance del documento.
+
+| Elemento | Resultado de la revisión |
+|---|---|
+| HU-06 y HU-07 | Mesa/para llevar y reserva con hora están escritos, pero no implementados |
+| RF-04 | Tamaños implementados; falta combinar hasta dos sabores en una sola pizza |
+| HU-10, HU-11, HU-12, HU-14 | Productos e insumos no son equivalentes; falta la parte de materias primas y su consumo |
+| Figura 24 | Falta VENDEDOR, aunque está en la Tabla 8; añadir sus asociaciones al gestionar pedidos y registrar cobros |
+| Relación pedido/venta en Figura 24 | Retirar el include obligatorio entre realizar pedido y registrar venta: la compra web puede quedar pendiente sin cobro |
+| Sesión y JWT | Describir Supabase Auth como emisor de identidad y la lectura de roles vigentes en Flask; conservar la evolución histórica si corresponde |
+| Sprint 3 | Actualizar aceptación del flujo y conciliación del pedido #1 con las evidencias informadas, sin inventar capturas |
+| Tabla 9 | Fechas de encabezados de PLANIFICACION_SCRUM.md alineadas con las del ODT |
+| Incrementos posteriores | El ODT desarrolla hasta Sprint 3; faltan las secciones correspondientes a los incrementos siguientes |
+| Modelos anunciados | El texto remite a modelos en 3.2.6, despliegue en 3.2.7.3 y entidad-relación en 3.2.8.1; completar y comprobar las referencias al incorporarlos |
+| CAPTCHA | Aparece como fundamento teórico; todavía no constituye una funcionalidad implementada |
+
+Las cuentas pueden reunir varios roles; el administrador no hereda CLIENTE
+automáticamente. Por eso el diagrama de casos de uso debe asociar cada rol a sus
+operaciones, sin una generalización que conceda permisos inexistentes. El catálogo
+es público. El historial y la compra web requieren CLIENTE; el cobro y los estados
+requieren VENDEDOR o ADMINISTRADOR; productos, inventario, usuarios y reportes
+requieren ADMINISTRADOR.
+
+### Secuencia de confirmación del pedido implementada
+
+```mermaid
+sequenceDiagram
+    actor Cliente
+    participant Web as React / Axios
+    participant API as Flask
+    participant Auth as Supabase Auth
+    participant DB as PostgreSQL
+    Cliente->>Web: Confirmar carrito y datos de entrega
+    Web->>API: POST /api/pedidos con token, productos y cantidades
+    API->>Auth: Validar identidad del token
+    Auth-->>API: Identidad válida
+    API->>DB: Consultar perfil y roles vigentes
+    DB-->>API: Perfil con rol CLIENTE
+    Note over API: Validar datos del pedido
+    API->>DB: crear_pedido_atomico
+    Note over DB: Bloquear productos por ID y comprobar stock<br/>Calcular precios, guardar pedido/detalles y descontar existencias
+    alt Stock y datos válidos
+        DB-->>API: Transacción confirmada: pedido PENDIENTE
+        Note over API: Intentar notificación si Telegram está configurado<br/>Un fallo del aviso no revierte el pedido
+        API-->>Web: 201 con pedido y detalles
+        Web-->>Cliente: Mostrar pedido registrado e historial
+    else Stock insuficiente u otro error de negocio
+        DB-->>API: Revertir todas las escrituras
+        API-->>Web: Error de validación
+        Web-->>Cliente: Mostrar motivo y conservar carrito
+    end
+    Note over API,DB: Si identidad, rol o datos fallan antes, no se ejecuta la RPC
+```
+
+### Estados del pedido implementados
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDIENTE: Compra web confirmada
+    PENDIENTE --> EN_PREPARACION
+    EN_PREPARACION --> EN_CAMINO
+    EN_CAMINO --> ENTREGADO
+    PENDIENTE --> CANCELADO
+    EN_PREPARACION --> CANCELADO
+    EN_CAMINO --> CANCELADO
+    [*] --> ENTREGADO: Venta en local atómica
+    ENTREGADO --> [*]
+    CANCELADO --> [*]
+    note right of CANCELADO
+        Requiere saber si hubo descuento.
+        Devuelve stock una sola vez si corresponde.
+    end note
+    note right of ENTREGADO
+        El cobro es una operación separada.
+        En venta local se registra en la misma transacción.
+    end note
+```
+
+Estos diagramas describen el sistema actual. Mesa, reservas, insumos y mitades
+deben reflejarse cuando sus flujos estén implementados y validados. La revisión
+identifica correcciones; no certifica que el documento académico ya esté terminado.

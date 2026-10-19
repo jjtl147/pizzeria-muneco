@@ -5,7 +5,10 @@ aplicación de 003/004 y se verificaron la columna `usuarios.auth_user_id`, el b
 `productos` y el proveedor Email habilitado con confirmación requerida. Flask ya
 se reinició. El estudiante aceptó el flujo operativo de compra, estados,
 cobro y permisos al cierre de la jornada. La configuración de URLs/SMTP y las
-pruebas específicas de correo, cuentas heredadas y fotos reales siguen pendientes. Para reproducir la instalación, seguir estos pasos. Se requiere
+pruebas de confirmación, cuentas heredadas y fotos reales siguen pendientes.
+El 19 de octubre el estudiante confirmó recuperación por Gmail e inicio de sesión
+con la contraseña nueva. No se infiere de esa prueba que exista SMTP personalizado.
+Para reproducir la instalación, seguir estos pasos. Se requiere
 que 001 y 002 ya estén aplicadas; **no volver a ejecutarlas**.
 
 ## 1. Migraciones
@@ -15,8 +18,9 @@ En el SQL Editor del proyecto Supabase, ejecutar una vez, en este orden:
 1. [003_supabase_auth.sql](backend/migrations/003_supabase_auth.sql).
 2. [004_imagenes_storage.sql](backend/migrations/004_imagenes_storage.sql).
 3. [005_eliminar_rol_heredado.sql](backend/migrations/005_eliminar_rol_heredado.sql).
-   Esta limpieza está preparada y probada localmente; su ejecución real todavía
-   no está confirmada. Elimina solo la columna antigua `usuarios.rol` y conserva
+   El 19 de octubre se confirmó su resultado en Supabase por consulta de esquema:
+   `usuarios.rol` no existe y `usuarios.roles` es accesible. No repetirla en este
+   proyecto. Elimina solo la columna antigua `usuarios.rol` y conserva
    `usuarios.roles`. Al terminar debe mostrar `false` para `rol_antiguo_existe`
    y `true` para `roles_vigentes_existen`. No repetir 003/004 si ya se aplicaron.
 
@@ -121,12 +125,15 @@ seguir válidos hasta su vencimiento, según el comportamiento de Supabase.
 5. Cerrar sesión y comprobar que las rutas protegidas vuelven al login.
 6. Desde Productos, subir una foto y guardar el producto; revisar catálogo y bucket.
 7. Repetir compra, estados, cobro y permisos con cuentas cliente/vendedor/admin.
-   El pedido #1 permanece sin conciliar; no cancelarlo hasta revisar su stock.
+   Los pedidos con `stock_descontado=NULL` necesitan conciliación antes de
+   cancelarse. El pedido #1 se concilió el 19 de octubre con el descuento
+   confirmado por el estudiante; su marca es TRUE y no se alteró inventario.
 
 El estudiante confirmó el funcionamiento del flujo operativo del punto 7 al
-cierre del 15 de octubre. Esto no acepta por extensión confirmación/recuperación
-por correo, fotos reales ni importación de todas las cuentas heredadas, que
-siguen pendientes de comprobación específica. Las pruebas locales simulan Auth
+cierre del 15 de octubre y, el 19 de octubre, la recuperación por Gmail con login
+usando la contraseña nueva del punto 4. Sigue pendiente probar enlaces vencidos
+o usados, confirmación de registro, fotos reales e importación de las cuentas
+heredadas restantes. Las pruebas locales simulan Auth
 y Storage; no comprueban entrega de correo ni configuración del proveedor.
 
 ## Otros servicios

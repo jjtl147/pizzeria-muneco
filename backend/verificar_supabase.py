@@ -57,6 +57,22 @@ def verificar():
         print('Revise las evidencias de stock antes de asignar stock_descontado.')
     identidades = db.table('usuarios').select('id', count='exact', head=True).is_('auth_user_id', 'null').execute()
     print(f'Perfiles sin vincular a Supabase Auth: {identidades.count}')
+    # GET conserva el código PostgreSQL del error; HEAD puede devolver solo 400.
+    # limit(0) comprueba el esquema sin descargar perfiles.
+    try:
+        db.table('usuarios').select('rol').limit(0).execute()
+        print('PENDIENTE 005: la columna heredada usuarios.rol todavía existe.')
+    except APIError as error:
+        if error.code == '42703':
+            print('OK 005: usuarios.rol ausente y usuarios.roles accesible.')
+        else:
+            print(f'AVISO 005: no se pudo determinar el estado; código {error.code}.')
+    try:
+        bucket = db.storage.get_bucket('productos')
+        print(f'Storage productos: público={bucket.public}; límite={bucket.file_size_limit} bytes; '
+              f'formatos={bucket.allowed_mime_types}.')
+    except Exception:
+        print('AVISO Storage: no se pudo consultar el bucket productos.')
     print('Diagnóstico de lectura terminado. La compra, los cobros y los permisos aún requieren aceptación.')
     return 0
 
