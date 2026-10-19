@@ -15,26 +15,28 @@ código implementado con despliegue o servicio externo operativo.
 
 **Avance del plan original: 88 % (44 de 50 tareas marcadas; quedan 6).**
 
-**Sin las tareas del asistente: 93,3 % (42 de 45 tareas marcadas; quedan 3).**
-Se excluyen cinco casillas completas, sin borrarlas ni dividirlas: código del
-asistente, restricción de sus herramientas, configuración del proveedor y las
-dos verificaciones conjuntas de notificaciones/LLM (Sprint 5 y buffer). Dos de
-esas cinco están marcadas. El consumo de productos se mantiene porque es un
-reporte independiente, aunque también lo consulten las herramientas del asistente.
-El código y la configuración de notificaciones de Telegram se mantienen en el
-indicador. Excluir las verificaciones conjuntas no significa que los avisos
-reales estén comprobados: su entrega sigue pendiente.
+**Núcleo funcional del plan, sin bot/asistente ni cierre académico: 100 %
+(41 de 41 tareas marcadas).** Para este indicador se excluyen siete casillas del
+bot/asistente —código de Telegram, código y permisos del LLM, creación del bot,
+proveedor y dos comprobaciones externas conjuntas— y dos actividades académicas:
+revisar UML/documentación y ensayar la defensa. Se excluyen como unidades completas,
+sin borrarlas, dividirlas ni cambiar su estado. Tres de las nueve excluidas ya
+están marcadas. Configurar y comprobar las notificaciones de Telegram pertenece
+al bot y se realizará al final junto con el asistente, por decisión del estudiante.
+El reporte de consumo de productos permanece en el núcleo porque funciona sin LLM.
 
-**Total técnico sin asistente, incluyendo la ampliación Auth/Storage ya existente:
-88,9 % (48 de 54 tareas).** Son 42/45 del plan original más 6/9 de Auth/Storage.
-Las nueve tareas de esa ampliación ya estaban registradas antes de esta sesión;
-no se han añadido ahora. La recuperación aceptada no cierra por sí sola su casilla
-agrupada de confirmación, sesiones y enlaces vencidos. Este total deja seis
-casillas abiertas: tres del plan original y tres de la ampliación.
+**Total técnico sin bot/asistente ni cierre académico, incluyendo la ampliación
+Auth/Storage ya existente: 94 % (47 de 50 tareas).** Son 41/41 del núcleo más
+6/9 de Auth/Storage. Las nueve tareas de esa ampliación ya estaban registradas;
+no se han añadido ahora. Quedan abiertas sus tres casillas agrupadas. La subida
+y visualización de una foto permanece expresamente sin marcar hasta que el
+estudiante la confirme.
 
-Estos porcentajes corresponden a la lista técnica del repositorio y **no miden
-la cobertura completa del documento académico**. La comparación con las historias
-ya escritas en su Tabla 6 se presenta abajo; no se agregan tareas a los sprints.
+Estos porcentajes corresponden a las casillas existentes y **no significan que
+el sistema ya coincida por completo con el alcance acordado**. Aún deben
+implementarse el inventario/consumo de insumos, la pizza de hasta dos sabores,
+CAPTCHA y la nota libre del pedido. Se registran como diferencias de alcance
+fuera de las casillas actuales; no se agregan tareas a los sprints sin consulta.
 
 Se cuentan únicamente las tareas de los cinco sprints y del buffer final;
 el resumen repite tareas y no se cuenta nuevamente. Cada tarea tiene el mismo
@@ -63,7 +65,7 @@ con las historias del documento identificadas en esta revisión.
 |---|---|
 | Vistas base, rutas, catálogo y carrito | Implementadas |
 | API Flask, Supabase y esquema inicial | Implementados |
-| Login, sesión y pedidos del cliente con Axios | Flujo operativo aceptado; recuperación por Gmail y login con contraseña nueva confirmados por el estudiante; confirmación de registro pendiente |
+| Login, sesión y pedidos del cliente con Axios | Flujo operativo aceptado; confirmación de cuenta por Gmail, recuperación y login con contraseña nueva confirmados por el estudiante |
 | Roles combinables y tamaños con precio/stock propios | Implementados; aceptación del flujo informada por el estudiante |
 | Panel del vendedor: pedidos, ventas y tipo de pago | Implementado; operación aceptada por el estudiante |
 | Panel del administrador: productos, categorías, inventario, usuarios y roles | Implementado; aceptación operativa informada por el estudiante |
@@ -73,8 +75,8 @@ con las historias del documento identificadas en esta revisión.
 La conexión por Axios incluye ahora catálogo, autenticación, pedidos y paneles.
 Verificación local actual: 41 pruebas Python, tres recorridos de navegador
 y migraciones 001–005 aprobadas; ESLint y compilación correctos. Login administrativo real en Auth comprobado y
-bucket de Storage configurado. Recuperación por Gmail y acceso con contraseña
-nueva aceptados por el estudiante el 19 de octubre. Las fotos reales y
+bucket de Storage configurado. Confirmación de una cuenta por Gmail, recuperación
+y acceso con contraseña nueva aceptados por el estudiante el 19 de octubre. Las fotos reales y
 las comprobaciones específicas de servicios externos siguen pendientes. La
 aceptación del flujo operativo fue informada por el estudiante al finalizar el día.
 
@@ -319,8 +321,9 @@ activado.
 - [ ] Configurar Auth, URLs de retorno y correo SMTP en el panel.
 - [ ] Validar migración del administrador, confirmación, recuperación, cierre y
       renovación con Auth real; comprobar enlaces vencidos/usados del proveedor.
-      Recuperación por Gmail y login con contraseña nueva aceptados por el estudiante
-      el 19 de octubre. La casilla agrupa otros flujos aún por verificar.
+      Confirmación de cuenta por Gmail, recuperación y login con contraseña nueva
+      aceptados por el estudiante el 19 de octubre. La casilla continúa abierta
+      porque agrupa migración, cierre, renovación y enlaces vencidos/usados.
 - [ ] Validar subida y visualización de fotos con Storage real y los permisos.
 
 Comprobación tras activar las migraciones: Auth por correo habilitado, registro
@@ -373,10 +376,10 @@ pública. No pegar claves reales en este archivo.
 ## Continuación — 19 de octubre de 2026
 
 Se prioriza cerrar los pendientes del plan existente antes de incorporar pizzas
-de dos mitades, CAPTCHA y control de insumos. Telegram sigue contemplado: además
-de activar las notificaciones, falta recibir consultas desde el bot y conectarlas
-al asistente. Los roles combinables se conservan. El estudiante actualizará la
-descripción de autenticación en su documento académico.
+de dos mitades, CAPTCHA, nota libre y control de insumos. Telegram y sus
+notificaciones se consideran parte del bot/asistente y se trabajarán al final.
+Los roles combinables se conservan. El estudiante actualizará la descripción de
+autenticación en su documento académico.
 
 ### Evidencia de esta sesión
 
@@ -398,8 +401,9 @@ descripción de autenticación en su documento académico.
   (código PostgreSQL 42703) y `usuarios.roles` es accesible. No se repitió la migración.
 - El estudiante informa que no ha configurado SMTP personalizado, URLs de retorno,
   bot de Telegram ni proveedor del asistente. Posteriormente confirma que recibió
-  la recuperación por Gmail y pudo entrar con la contraseña nueva. Esto acepta
-  ese flujo con la cuenta probada, sin inferir qué servicio SMTP realizó el envío.
+  la confirmación de creación de cuenta y la recuperación por Gmail, y que pudo
+  entrar con la contraseña nueva. Esto acepta esos flujos con la cuenta probada,
+  sin inferir qué servicio SMTP realizó el envío.
 - La subida de una foto desde Productos sigue sin probarse, según el estudiante.
 - El estudiante confirma que el pedido #1 sí descontó stock y que lo revisó en
   Supabase. Con esa evidencia informada se actualizó únicamente `stock_descontado`
@@ -412,9 +416,8 @@ descripción de autenticación en su documento académico.
 
 Por instrucción del estudiante, cualquier tarea nueva o ampliación de los sprints
 debe consultarse antes de incorporarla. Se mantienen las 50 casillas existentes;
-las fechas de sus encabezados se alinean con la Tabla 9 del documento. El asistente
-y sus consultas por Telegram se trabajan al final. Las notificaciones automáticas
-son independientes del LLM y pueden configurarse antes.
+las fechas de sus encabezados se alinean con la Tabla 9 del documento. El bot,
+las notificaciones de Telegram y las consultas del asistente se trabajan al final.
 
 La Tabla 6 de `proyecto_grado.odt` ya contiene estas historias. Esta es una
 comparación con el código, no una nueva lista de tareas ni una modificación del
@@ -423,42 +426,48 @@ ODT. «Implementada» describe código disponible, no todas las pruebas externas
 | Historias existentes | Cobertura actual |
 |---|---|
 | HU-01, HU-02, HU-03, HU-04, HU-05 | Implementadas: acceso, catálogo, carrito, pedido e historial |
-| HU-06 | Pendiente: elegir mesa o para llevar; actualmente se solicita dirección de entrega |
-| HU-07 | Pendiente: reserva con hora requerida; no hay campo ni flujo para programarla |
+| HU-06 | Retirada del alcance por decisión del estudiante: no se distinguirá mesa o para llevar |
+| HU-07 | Retirada del alcance por decisión del estudiante: no habrá reserva estructurada con hora |
 | HU-08, HU-09 | Implementadas: gestión de productos y registro del tipo de pago |
 | HU-10 | Parcial: inventario de productos implementado; insumos pendientes |
 | HU-11 | Parcial: mínimos de productos implementados; mínimos de insumos pendientes |
-| HU-12 | Parcial: código de avisos Telegram para productos; faltan activación real e insumos |
+| HU-12 | Parcial y reservada para el final: el bot avisará cuando un insumo llegue al mínimo o se agote |
 | HU-13 | Implementada: reportes de ventas |
 | HU-14 | Pendiente: consumo semanal de insumos; el reporte actual mide productos |
 | HU-15, HU-16 | Se apartan del indicador documental del asistente/Telegram para el final |
 
-**Cobertura por historias del documento sin HU-15/HU-16: 8 de 14 implementadas
-(57,1 %), 3 parciales y 3 pendientes.** Las parciales no reciben puntuación
-arbitraria. Este indicador cuenta historias, no las 45 tareas técnicas, y tampoco
-mide horas de trabajo. RF-04 precisa además dos sabores en una pizza, todavía
+HU-06 y HU-07 deben retirarse de la siguiente actualización del documento. Se
+reemplazan funcionalmente por **una nota libre y opcional en el pedido**, donde
+el cliente podrá indicar para cuándo lo necesita o escribir cualquier aclaración.
+Esta decisión evita campos y reglas separadas de mesa, modalidad y reserva. La
+nota todavía no está implementada y no se convierte en una casilla nueva del
+sprint sin aprobación expresa.
+
+**Cobertura por historias vigentes del documento sin HU-06, HU-07, HU-15 y HU-16:
+8 de 12 implementadas (66,7 %), 3 parciales y 1 pendiente.** Las parciales no
+reciben puntuación arbitraria. Este indicador cuenta historias, no tareas técnicas,
+y tampoco mide horas. RF-04 precisa además dos sabores en una pizza, todavía
 pendiente; CAPTCHA aparece en el marco teórico y su incorporación fue solicitada,
 pero no se crea por eso una nueva casilla del sprint sin consulta.
 
 La revisión de la Figura 24 encontró que «Realizar pedido» incluye «Registrar
 venta». En el código, un pedido web solo se cobra después de entregarse: deben
 representarse como casos distintos y asociar el cobro al vendedor/administrador.
-Falta representar al vendedor, que sí aparece en la Tabla 8. También hay que
-resolver la correspondencia de HU-06/HU-07 con el diagrama. El documento desarrolla
+Falta representar al vendedor, que sí aparece en la Tabla 8. HU-06/HU-07 deben
+retirarse y la nota libre debe reflejarse cuando se implemente. El documento desarrolla
 los incrementos hasta Sprint 3; Sprint 4/5 y los modelos anunciados requieren
 completarse. Estas observaciones pertenecen a la tarea de revisión ya existente.
 
 ### Orden para continuar
 
-1. Validar subida y visualización de una foto desde Productos y los permisos.
-2. Completar las comprobaciones de confirmación/URLs y revisar el proveedor SMTP
-   para envío a clientes. La recuperación y el login con contraseña nueva ya se
-   aceptaron; no se exige repetirlos para continuar con otras tareas.
-3. Configurar bot/chat y comprobar los avisos automáticos contemplados en el plan.
-4. Completar la revisión documental, los diagramas y el ensayo dentro de las
-   tareas existentes. Consultar antes de agregar o redistribuir tareas para cerrar
-   las diferencias de cobertura indicadas arriba.
-5. Al final, configurar y validar el asistente y sus consultas por Telegram.
+1. Mantener sin marcar la subida y visualización de una foto hasta que el
+   estudiante realice y confirme la prueba.
+2. En la próxima jornada, acordar antes de crear tareas cómo incorporar nota libre,
+   dos sabores, CAPTCHA e inventario/consumo de insumos.
+3. Actualizar posteriormente el documento para retirar HU-06/HU-07 y reflejar
+   solo funcionalidades implementadas y verificadas.
+4. Al final, configurar y validar el bot/asistente, incluidas las notificaciones
+   de Telegram cuando falten insumos o alcancen su nivel mínimo.
 
 ## Metodología
 
