@@ -1,0 +1,43 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Arquitectura de comunicación — Interfaces y límites
+left to right direction
+node "Navegador" {
+  [React / Axios] as UI
+}
+node "Servidor de aplicación" {
+  [API Flask] as API
+}
+cloud "Supabase" {
+  [Auth\n/auth/v1] as Auth
+  [PostgREST / RPC\n/rest/v1] as Datos
+  [Storage\n/storage/v1] as Storage
+  database PostgreSQL as DB
+}
+cloud "Servicios opcionales\nPendientes de configuración y validación" {
+  [Telegram Bot API] as Telegram
+  [Proveedor LLM] as LLM
+}
+UI --> API : HTTP local / HTTPS propuesto en producción\nJSON; Bearer en solicitudes protegidas\nmultipart/form-data para fotos
+API --> Auth : HTTPS: credenciales, validación\ny renovación de sesión
+API --> Datos : HTTPS: consultas y RPC\nclave de servicio solo en servidor
+Datos --> DB : SQL y transacciones
+Auth --> DB : Identidades y trigger de perfil
+API --> Storage : HTTPS: carga autorizada\npor administrador
+UI --> Storage : HTTPS: lectura pública de imágenes
+API ..> Telegram : HTTPS: avisos si está habilitado
+API ..> LLM : HTTPS: consultas si está habilitado
+@enduml

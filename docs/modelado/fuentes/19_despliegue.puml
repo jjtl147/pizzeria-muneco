@@ -1,0 +1,44 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Diagrama de despliegue — Entorno de desarrollo documentado
+node "Equipo de desarrollo" as Equipo {
+  node "Navegador web" {
+    artifact "Aplicación React\nJavaScript, HTML y CSS" as SPA
+  }
+  node "Proceso Vite\npuerto habitual 5173" as Vite {
+    artifact "frontend/" as Front
+  }
+  node "Proceso Python / Flask\npuerto predeterminado 5000" as Flask {
+    artifact "backend/app.py\nauth_supabase.py\nintegrations.py" as Back
+  }
+}
+cloud "Proyecto remoto Supabase" {
+  node "Servicio Auth" as Auth
+  node "API de datos / RPC" as Datos
+  database "PostgreSQL\nEsquema public + auth" as DB
+  node "Servicio Storage" as Storage {
+    artifact "Bucket público productos" as Bucket
+  }
+}
+SPA --> Vite : HTTP: cargar aplicación
+SPA --> Flask : HTTP / JSON\nAuthorization: Bearer
+Flask --> Auth : HTTPS
+Flask --> Datos : HTTPS
+Datos --> DB
+Auth --> DB
+Flask --> Storage : HTTPS: subir fotos
+SPA --> Storage : HTTPS: leer imágenes
+@enduml

@@ -1,0 +1,49 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Arquitectura de la aplicación — Componentes actuales
+top to bottom direction
+package "Presentación — Navegador" {
+  [React: catálogo, carrito, cuentas\ny paneles operativos] as React
+  [Context API: sesión y carrito] as Context
+  [Axios: cliente HTTP\ny renovación de sesión] as Axios
+  React --> Context
+  React --> Axios
+}
+package "Servidor de aplicación — Python / Flask" {
+  [Rutas REST y validación\nbackend/app.py] as Rutas
+  [Autenticación y autorización\npor roles vigentes] as Seguridad
+  [Adaptador Auth\nbackend/auth_supabase.py] as Adaptador
+  [Acceso a datos\ncliente Supabase] as Cliente
+  Rutas --> Seguridad
+  Rutas --> Adaptador
+  Seguridad --> Adaptador
+  Seguridad --> Cliente
+  Rutas --> Cliente
+}
+package "Servicios gestionados — Supabase" {
+  [Auth] as Auth
+  [API de datos\nPostgREST / RPC] as Datos
+  database "PostgreSQL\nTablas, funciones transaccionales\ny trigger de perfiles Auth" as DB
+  [Storage\nbucket productos] as Storage
+  Auth --> DB : identidad y perfil
+  Datos --> DB
+}
+Axios --> Rutas : HTTP/JSON + Bearer token
+Adaptador --> Auth : HTTPS
+Cliente --> Datos : HTTPS
+Cliente --> Storage : Subida de imágenes
+React --> Storage : GET imagen pública
+@enduml

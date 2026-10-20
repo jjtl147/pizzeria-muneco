@@ -1,0 +1,47 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 55
+hide footbox
+title Secuencia — Iniciar sesión (CU-02)
+autonumber
+actor Persona
+participant "React / Axios" as UI
+participant "API Flask" as API
+participant "Supabase Auth" as Auth
+participant "API de datos Supabase" as Datos
+database PostgreSQL as DB
+Persona -> UI : Introducir correo y contraseña
+UI -> API : POST /api/auth/login
+API -> API : Validar formato de credenciales
+API -> Datos : Buscar perfil por correo\npara compatibilidad con cuentas heredadas
+Datos -> DB : SELECT perfil de transición
+DB --> Datos : Perfil o vacío
+Datos --> API : Resultado
+API -> Auth : POST /auth/v1/token?grant_type=password
+alt Credenciales válidas de cuenta vinculada
+  Auth --> API : Access token, refresh token, usuario y expiración
+  API -> Datos : Consultar perfil por auth_user_id
+  Datos -> DB : SELECT perfil y roles
+  DB --> Datos : Perfil vigente
+  Datos --> API : Perfil
+  API --> UI : 200: sesión y perfil
+  UI -> UI : Guardar sesión en sessionStorage
+  UI --> Persona : Mostrar opciones según roles
+else Credenciales inválidas
+  Auth --> API : Error de autenticación
+  API --> UI : Rechazo de inicio de sesión
+  UI --> Persona : Mostrar mensaje
+end
+@enduml

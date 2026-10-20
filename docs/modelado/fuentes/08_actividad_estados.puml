@@ -1,0 +1,43 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Actividad — Actualizar estado (CU-10)
+|Vendedor o administrador|
+start
+:Elegir pedido y estado siguiente;
+|API Flask|
+:Validar identidad, rol y datos;
+if (¿Solicitud autorizada y válida?) then (no)
+  :Rechazar solicitud;
+  stop
+else (sí)
+endif
+|PostgreSQL|
+:Bloquear pedido\nen cambiar_estado_pedido;
+if (¿Estado solicitado igual al actual?) then (sí)
+  :Devolver pedido sin nuevo historial;
+  stop
+else (no)
+endif
+if (¿Transición permitida?) then (no)
+  :Rechazar y revertir;
+  stop
+else (sí)
+endif
+:Actualizar estado e insertar historial\nen una transacción;
+|Vendedor o administrador|
+:Ver resultado;
+stop
+@enduml

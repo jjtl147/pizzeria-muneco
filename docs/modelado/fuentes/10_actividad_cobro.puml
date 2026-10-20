@@ -1,0 +1,40 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Actividad — Registrar cobro (CU-12)
+|Vendedor o administrador|
+start
+:Elegir pedido e indicar método recibido:\nEFECTIVO, QR o TARJETA;
+|API Flask|
+:Validar identidad, rol y método;
+if (¿Solicitud autorizada y válida?) then (no)
+  :Rechazar solicitud;
+  stop
+else (sí)
+endif
+|PostgreSQL|
+:Bloquear pedido en registrar_venta;
+if (¿Pedido ENTREGADO sin venta previa?) then (no)
+  :Rechazar y revertir;
+  stop
+else (sí)
+endif
+:Insertar venta con total del pedido\ny operador que registra el cobro;
+:Actualizar método en el pedido;
+:Confirmar transacción;
+|Vendedor o administrador|
+:Ver cobro registrado;
+stop
+@enduml

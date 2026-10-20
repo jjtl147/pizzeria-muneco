@@ -1,0 +1,100 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Diagrama de clases del dominio — Modelo actual
+hide methods
+class Usuario {
+  id: Integer
+  authUserId: UUID [0..1]
+  nombre: String
+  email: String
+  roles: Rol [1..3]
+}
+enum Rol {
+  CLIENTE
+  VENDEDOR
+  ADMINISTRADOR
+}
+class Categoria {
+  id: Integer
+  nombre: String
+  activo: Boolean
+}
+class Producto {
+  id: Integer
+  nombre: String
+  tamano: String [0..1]
+  precio: Decimal
+  imagen: String [0..1]
+  activo: Boolean
+}
+class Inventario {
+  id: Integer
+  stockActual: Integer
+  stockMinimo: Integer
+}
+class Pedido {
+  id: Integer
+  fechaPedido: DateTime
+  estado: EstadoPedido
+  total: Decimal
+  direccionEntrega: String
+  stockDescontado: Boolean [0..1]
+}
+class DetallePedido {
+  id: Integer
+  nombreProducto: String [0..1]
+  tamano: String [0..1]
+  cantidad: Integer
+  precioUnitario: Decimal
+  subtotal: Decimal
+}
+class Venta {
+  id: Integer
+  fechaVenta: DateTime
+  total: Decimal
+  metodoPago: MetodoPago
+}
+class HistorialEstado {
+  id: Integer
+  estadoAnterior: String
+  estadoNuevo: String
+  fecha: DateTime
+}
+enum EstadoPedido {
+  PENDIENTE
+  EN_PREPARACION
+  EN_CAMINO
+  ENTREGADO
+  CANCELADO
+}
+enum MetodoPago {
+  EFECTIVO
+  QR
+  TARJETA
+}
+Usuario ..> Rol
+Categoria "0..1" -- "0..*" Producto : clasifica
+Producto "1" -- "0..1" Inventario : dispone de
+Usuario "0..1" -- "0..*" Pedido : registra
+Pedido "1" *-- "1..*" DetallePedido : contiene
+Producto "0..1" -- "0..*" DetallePedido : referencia histórica
+Pedido "1" -- "0..1" Venta : se cobra mediante
+Usuario "0..1" -- "0..*" Venta : registra el cobro
+Pedido "1" -- "0..*" HistorialEstado : registra cambios
+Usuario "0..1" -- "0..*" HistorialEstado : ejecuta
+Pedido ..> EstadoPedido
+Venta ..> MetodoPago
+@enduml

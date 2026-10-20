@@ -1,0 +1,64 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 55
+hide footbox
+title Secuencia — Cancelar pedido (CU-11)
+autonumber
+actor "Vendedor / administrador" as Operador
+participant "React / Axios" as UI
+participant "API Flask" as API
+participant "Supabase Auth" as Auth
+participant "API de datos Supabase\nPostgREST / RPC" as Datos
+database PostgreSQL as DB
+Operador -> UI : Solicitar CANCELADO
+UI -> API : PUT /api/pedidos/{id}/estado + Bearer token
+group Validación de solicitud protegida
+  API -> Auth : GET /auth/v1/user (Bearer token)
+  Auth --> API : Identidad o error
+  alt Identidad válida
+    API -> Datos : Consultar usuarios por auth_user_id
+  Datos -> DB : SELECT perfil y roles vigentes
+  DB --> Datos : Perfil
+  Datos --> API : Perfil y roles
+    API -> API : Exigir rol permitido y validar datos
+  else Identidad inválida
+    API -> API : Marcar solicitud rechazada sin consultar perfil
+  end
+end
+alt Solicitud autorizada y válida
+  API -> Datos : RPC cambiar_estado_pedido(actor, id, CANCELADO)
+  Datos -> DB : Iniciar transacción y bloquear pedido
+  alt Pedido ya CANCELADO
+    DB --> Datos : Devolver pedido sin devolver stock otra vez
+    Datos --> API : Pedido actual
+    API --> UI : 200
+  else Transición válida y stock conciliado
+    opt stock_descontado = TRUE
+      DB -> DB : Restituir cantidades por producto del detalle
+    end
+    DB -> DB : Insertar historial y actualizar CANCELADO\ny stock_descontado = FALSE
+    DB --> Datos : COMMIT: pedido actualizado
+    Datos --> API : Resultado
+    API --> UI : 200
+  else Estado terminal o stock_descontado = NULL
+    DB --> Datos : ROLLBACK + error de negocio
+    Datos --> API : Error
+    API --> UI : 400
+  end
+else Solicitud rechazada
+  API --> UI : 401 / 403 / 400
+end
+UI --> Operador : Mostrar resultado
+@enduml

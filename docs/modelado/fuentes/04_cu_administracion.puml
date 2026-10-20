@@ -1,0 +1,32 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+left to right direction
+actor Administrador
+rectangle "Sistema web — Administración" {
+  usecase "Gestionar productos" as Productos
+  usecase "Gestionar categorías" as Categorias
+  usecase "Consultar y ajustar inventario" as Inventario
+  usecase "Consultar usuarios" as Usuarios
+  usecase "Asignar o retirar roles" as Roles
+  usecase "Subir imagen de producto" as Imagen
+}
+Administrador -- Productos
+Administrador -- Categorias
+Administrador -- Inventario
+Administrador -- Usuarios
+Administrador -- Roles
+Administrador -- Imagen
+@enduml

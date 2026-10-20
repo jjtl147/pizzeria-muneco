@@ -1,0 +1,51 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Actividad — Realizar pedido web (CU-07)
+|Cliente|
+start
+:Elegir productos, tamaños y cantidades;
+:Revisar carrito y datos de entrega;
+:Confirmar pedido;
+|API Flask|
+:Validar identidad con Auth,\nrol CLIENTE y datos;
+if (¿Solicitud autorizada y válida?) then (no)
+  :Rechazar solicitud;
+  stop
+else (sí)
+endif
+|PostgreSQL|
+:Iniciar crear_pedido_atomico\ny crear cabecera provisional;
+:Agrupar ítems y bloquear filas\nen orden de identificador;
+if (¿Productos activos y stock suficiente?) then (no)
+  :Revertir pedido, detalles y stock;
+  |API Flask|
+  :Responder error de disponibilidad;
+  |Cliente|
+  :Conservar carrito y revisar compra;
+  stop
+else (sí)
+endif
+|PostgreSQL|
+:Crear detalles con precios del catálogo\ny nombre/tamaño históricos;
+:Descontar stock y actualizar total;
+:Confirmar transacción\nPedido PENDIENTE;
+|API Flask|
+:Intentar notificación opcional\nsi está habilitada;
+:Responder 201;
+|Cliente|
+:Ver confirmación y vaciar carrito;
+stop
+@enduml

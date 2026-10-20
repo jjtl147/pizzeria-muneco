@@ -1,0 +1,53 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Actividad — Cancelar pedido (CU-11)
+|Vendedor o administrador|
+start
+:Solicitar cancelación;
+|API Flask|
+:Validar identidad, rol y datos;
+if (¿Solicitud autorizada y válida?) then (no)
+  :Rechazar solicitud;
+  stop
+else (sí)
+endif
+|PostgreSQL|
+:Bloquear pedido;
+if (¿Pedido ya CANCELADO?) then (sí)
+  :Devolver pedido sin nueva devolución;
+  stop
+else (no)
+endif
+if (¿Estado previo a ENTREGADO?) then (no)
+  :Rechazar y revertir;
+  stop
+else (sí)
+endif
+if (¿stock_descontado es NULL?) then (sí)
+  :Rechazar; requiere conciliación previa;
+  stop
+else (no)
+endif
+if (¿stock_descontado es TRUE?) then (sí)
+  :Restituir cantidades de productos\nreferenciados por el detalle;
+else (no)
+endif
+:Actualizar CANCELADO y\nstock_descontado = FALSE;
+:Insertar historial y confirmar\ntodos los cambios juntos;
+|Vendedor o administrador|
+:Ver cancelación confirmada;
+stop
+@enduml

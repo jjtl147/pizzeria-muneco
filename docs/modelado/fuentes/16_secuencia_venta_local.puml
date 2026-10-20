@@ -1,0 +1,60 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 55
+hide footbox
+title Secuencia — Registrar venta en local (CU-13)
+autonumber
+actor "Vendedor / administrador" as Operador
+participant "React / Axios" as UI
+participant "API Flask" as API
+participant "Supabase Auth" as Auth
+participant "API de datos Supabase\nPostgREST / RPC" as Datos
+database PostgreSQL as DB
+Operador -> UI : Elegir productos, cantidades y método de pago
+UI -> API : POST /api/ventas {items, metodo_pago}\n(sin pedido_id) + Bearer token
+group Validación de solicitud protegida
+  API -> Auth : GET /auth/v1/user (Bearer token)
+  Auth --> API : Identidad o error
+  alt Identidad válida
+    API -> Datos : Consultar usuarios por auth_user_id
+  Datos -> DB : SELECT perfil y roles vigentes
+  DB --> Datos : Perfil
+  Datos --> API : Perfil y roles
+    API -> API : Exigir rol permitido y validar datos
+  else Identidad inválida
+    API -> API : Marcar solicitud rechazada sin consultar perfil
+  end
+end
+alt Solicitud autorizada y válida
+  API -> Datos : RPC venta_directa(actor, items, método)
+  Datos -> DB : Ejecutar una transacción
+  DB -> DB : crear_pedido_atomico(actor, Venta en local, ...)\nCrear pedido, detalles y descontar stock
+  DB -> DB : Marcar ENTREGADO y registrar historial
+  DB -> DB : registrar_venta(actor, pedido, método)
+  alt Todas las operaciones correctas
+    DB --> Datos : COMMIT: pedido_id y venta
+    Datos --> API : Resultado
+    API -> API : Notificación opcional si está habilitada
+    API --> UI : 201
+  else Error en cualquier operación
+    DB --> Datos : ROLLBACK de todos los cambios
+    Datos --> API : Error
+    API --> UI : 400 si es error de negocio
+  end
+else Solicitud rechazada
+  API --> UI : 401 / 403 / 400
+end
+UI --> Operador : Mostrar resultado
+@enduml

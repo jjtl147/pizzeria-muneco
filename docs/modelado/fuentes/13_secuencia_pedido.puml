@@ -1,0 +1,64 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 55
+hide footbox
+title Secuencia — Realizar pedido web (CU-07)
+autonumber
+actor Cliente
+participant "React / Axios" as UI
+participant "API Flask" as API
+participant "Supabase Auth" as Auth
+participant "API de datos Supabase\nPostgREST / RPC" as Datos
+database PostgreSQL as DB
+Cliente -> UI : Confirmar carrito y datos de entrega
+UI -> API : POST /api/pedidos + Bearer token
+group Validación de solicitud protegida
+  API -> Auth : GET /auth/v1/user (Bearer token)
+  Auth --> API : Identidad o error
+  alt Identidad válida
+    API -> Datos : Consultar usuarios por auth_user_id
+  Datos -> DB : SELECT perfil y roles vigentes
+  DB --> Datos : Perfil
+  Datos --> API : Perfil y roles
+    API -> API : Exigir rol permitido y validar datos
+  else Identidad inválida
+    API -> API : Marcar solicitud rechazada sin consultar perfil
+  end
+end
+alt Solicitud autorizada y válida
+  API -> Datos : RPC crear_pedido_atomico(...)
+  Datos -> DB : Ejecutar función en transacción
+  DB -> DB : Crear cabecera y bloquear filas\nValidar productos activos, stock y precios
+  alt Disponibilidad suficiente
+    DB -> DB : Insertar detalles y snapshots\nDescontar stock y actualizar total
+    DB --> Datos : COMMIT: pedido PENDIENTE y detalles
+    Datos --> API : Resultado
+    opt Telegram habilitado (pendiente de validación real)
+      API -> API : Intentar notificación; su fallo no revierte la compra
+    end
+    API --> UI : 201: pedido y detalles
+    UI -> UI : Vaciar carrito
+    UI --> Cliente : Mostrar confirmación
+  else Producto no disponible o stock insuficiente
+    DB --> Datos : ROLLBACK + excepción de negocio
+    Datos --> API : Error P0001
+    API --> UI : 400: motivo
+    UI --> Cliente : Mostrar error y conservar carrito
+  end
+else Identidad, rol o datos inválidos
+  API --> UI : 401 / 403 / 400 según motivo
+  UI --> Cliente : Mostrar error
+end
+@enduml

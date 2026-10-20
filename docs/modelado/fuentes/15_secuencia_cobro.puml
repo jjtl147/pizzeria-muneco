@@ -1,0 +1,57 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 55
+hide footbox
+title Secuencia — Registrar cobro de pedido (CU-12)
+autonumber
+actor "Vendedor / administrador" as Operador
+participant "React / Axios" as UI
+participant "API Flask" as API
+participant "Supabase Auth" as Auth
+participant "API de datos Supabase\nPostgREST / RPC" as Datos
+database PostgreSQL as DB
+Operador -> UI : Seleccionar pedido y método recibido
+UI -> API : POST /api/ventas {pedido_id, metodo_pago}\n+ Bearer token
+group Validación de solicitud protegida
+  API -> Auth : GET /auth/v1/user (Bearer token)
+  Auth --> API : Identidad o error
+  alt Identidad válida
+    API -> Datos : Consultar usuarios por auth_user_id
+  Datos -> DB : SELECT perfil y roles vigentes
+  DB --> Datos : Perfil
+  Datos --> API : Perfil y roles
+    API -> API : Exigir rol permitido y validar datos
+  else Identidad inválida
+    API -> API : Marcar solicitud rechazada sin consultar perfil
+  end
+end
+alt Solicitud autorizada y válida
+  API -> Datos : RPC registrar_venta(actor, pedido, método)
+  Datos -> DB : Iniciar transacción y bloquear pedido
+  alt Pedido ENTREGADO y sin cobro previo
+    DB -> DB : Insertar venta con total del pedido\nActualizar método de pago del pedido
+    DB --> Datos : COMMIT: venta
+    Datos --> API : Venta registrada
+    API --> UI : 201
+  else Pedido no entregado o venta existente
+    DB --> Datos : ROLLBACK + error de negocio
+    Datos --> API : Error
+    API --> UI : 400
+  end
+else Solicitud rechazada
+  API --> UI : 401 / 403 / 400
+end
+UI --> Operador : Mostrar resultado
+@enduml

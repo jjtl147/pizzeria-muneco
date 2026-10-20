@@ -1,0 +1,50 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Actividad — Venta en local (CU-13)
+|Vendedor o administrador|
+start
+:Elegir productos, cantidades\ny método recibido;
+:Confirmar venta;
+|API Flask|
+:Validar identidad, rol y datos;
+if (¿Solicitud autorizada y válida?) then (no)
+  :Rechazar solicitud;
+  stop
+else (sí)
+endif
+|PostgreSQL|
+:Iniciar transacción venta_directa;
+:Ejecutar crear_pedido_atomico\ncon usuario del operador;
+if (¿Productos activos y stock suficiente?) then (no)
+  :Revertir transacción;
+  stop
+else (sí)
+endif
+:Crear pedido y detalles\ny descontar existencias;
+:Marcar ENTREGADO\ne insertar historial;
+:Ejecutar registrar_venta;
+if (¿Cobro válido?) then (no)
+  :Revertir pedido, detalles,\nstock, historial y venta;
+  stop
+else (sí)
+endif
+:Confirmar todos los cambios juntos;
+|API Flask|
+:Notificación opcional y respuesta 201;
+|Vendedor o administrador|
+:Ver venta registrada;
+stop
+@enduml

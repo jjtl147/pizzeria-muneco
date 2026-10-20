@@ -1,0 +1,39 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+left to right direction
+actor Vendedor
+actor Administrador
+rectangle "Sistema web — Operación y ventas" {
+  usecase "Consultar pedidos" as Listado
+  usecase "Actualizar estado" as Estado
+  usecase "Cancelar pedido" as Cancelar
+  usecase "Registrar cobro de pedido" as Cobro
+  usecase "Registrar venta en local" as Local
+  usecase "Consultar ventas" as Ventas
+}
+Vendedor -- Listado
+Vendedor -- Estado
+Vendedor -- Cancelar
+Vendedor -- Cobro
+Vendedor -- Local
+Vendedor -- Ventas
+Listado -- Administrador
+Estado -- Administrador
+Cancelar -- Administrador
+Cobro -- Administrador
+Local -- Administrador
+Ventas -- Administrador
+@enduml

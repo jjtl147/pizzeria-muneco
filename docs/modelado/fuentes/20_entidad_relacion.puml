@@ -1,0 +1,113 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+title Modelo entidad-relación físico — schema.sql + migraciones 001–005
+hide methods
+hide circle
+entity "auth.users\n(gestionada por Supabase)" as auth_users {
+  * id : UUID <<PK>>
+}
+entity usuarios {
+  * id : INTEGER <<PK>>
+  --
+  auth_user_id : UUID <<FK, UNIQUE, NULL>>
+  * nombre : VARCHAR(100)
+  * email : VARCHAR(150) <<UNIQUE>>
+  password_hash : VARCHAR(255) <<NULL, transición>>
+  * roles : TEXT[]
+  telefono : VARCHAR(20) <<NULL>>
+  direccion : TEXT <<NULL>>
+  creado_en : TIMESTAMPTZ <<NULL>>
+}
+entity categorias {
+  * id : INTEGER <<PK>>
+  --
+  * nombre : VARCHAR(50) <<UNIQUE>>
+  descripcion : TEXT <<NULL>>
+  activo : BOOLEAN <<NULL>>
+  creado_en : TIMESTAMPTZ <<NULL>>
+}
+entity productos {
+  * id : INTEGER <<PK>>
+  --
+  categoria_id : INTEGER <<FK, NULL>>
+  * nombre : VARCHAR(100)
+  descripcion : TEXT <<NULL>>
+  * precio : NUMERIC(10,2)
+  imagen : TEXT <<NULL>>
+  activo : BOOLEAN <<NULL>>
+  creado_en : TIMESTAMPTZ <<NULL>>
+  tamano : VARCHAR(40) <<NULL>>
+}
+entity inventario {
+  * id : INTEGER <<PK>>
+  --
+  * producto_id : INTEGER <<FK, UNIQUE>>
+  * stock_actual : INTEGER
+  * stock_minimo : INTEGER
+  actualizado_en : TIMESTAMPTZ <<NULL>>
+}
+entity pedidos {
+  * id : INTEGER <<PK>>
+  --
+  usuario_id : INTEGER <<FK, NULL>>
+  fecha_pedido : TIMESTAMPTZ <<NULL>>
+  * estado : VARCHAR(30)
+  * total : NUMERIC(10,2)
+  * direccion_entrega : TEXT
+  telefono_contacto : VARCHAR(20) <<NULL>>
+  metodo_pago : VARCHAR(50) <<NULL>>
+  stock_descontado : BOOLEAN <<NULL>>
+}
+entity detalle_pedidos {
+  * id : INTEGER <<PK>>
+  --
+  * pedido_id : INTEGER <<FK>>
+  producto_id : INTEGER <<FK, NULL>>
+  * cantidad : INTEGER
+  * precio_unitario : NUMERIC(10,2)
+  * subtotal : NUMERIC(10,2)
+  nombre_producto : TEXT <<NULL>>
+  tamano : TEXT <<NULL>>
+}
+entity ventas {
+  * id : INTEGER <<PK>>
+  --
+  * pedido_id : INTEGER <<FK, UNIQUE>>
+  vendedor_id : INTEGER <<FK, NULL>>
+  * fecha_venta : TIMESTAMPTZ
+  * total : NUMERIC(10,2)
+  * metodo_pago : TEXT
+}
+entity historial_estados {
+  * id : INTEGER <<PK>>
+  --
+  * pedido_id : INTEGER <<FK>>
+  usuario_id : INTEGER <<FK, NULL>>
+  * estado_anterior : TEXT
+  * estado_nuevo : TEXT
+  * fecha : TIMESTAMPTZ
+}
+auth_users |o--o| usuarios : vincula
+categorias |o--o{ productos : clasifica
+productos ||--o| inventario : controla
+usuarios |o--o{ pedidos : registra
+pedidos ||--o{ detalle_pedidos : contiene
+productos |o--o{ detalle_pedidos : referencia
+pedidos ||--o| ventas : tiene cobro
+usuarios |o--o{ ventas : registra cobro
+pedidos ||--o{ historial_estados : tiene cambios
+usuarios |o--o{ historial_estados : ejecuta cambio
+@enduml

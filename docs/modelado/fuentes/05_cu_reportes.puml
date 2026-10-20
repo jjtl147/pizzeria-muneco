@@ -1,0 +1,26 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam defaultBorderColor #334155
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam usecaseBackgroundColor #EFF6FF
+skinparam classBackgroundColor #F8FAFC
+skinparam sequenceMessageAlign center
+hide footbox
+left to right direction
+actor Administrador
+rectangle "Sistema web — Reportes" {
+  usecase "Consultar reportes de ventas" as Reportes
+  usecase "Consultar consumo de productos" as Consumo
+  usecase "Exportar ventas por producto a CSV" as CSV
+}
+Administrador -- Reportes
+Administrador -- Consumo
+Administrador -- CSV
+@enduml
